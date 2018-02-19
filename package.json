@@ -1,0 +1,23 @@
+{
+  "name": "resclient",
+  "version": "1.0.0",
+  "description": "Client implementation of the RES-Client Protocol.",
+  "main": "./index.js",
+  "scripts": {
+    "build": "babel src --out-dir ./"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jirenius/resclient"
+  },
+  "author": "Samuel Jirénius <samuel@jirenius.se>",
+  "license": "MIT",
+  "homepage": "https://github.com/jirenius/resclient",
+  "devDependencies": {
+    "babel-cli": "^6.26.0",
+    "babel-preset-env": "^1.6.1"
+  },
+  "dependencies": {
+    "modapp-utils": "^1.0.1"
+  }
+}

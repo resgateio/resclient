@@ -1,0 +1,874 @@
+import CacheItem from './CacheItem';
+import ResCollection from './ResCollection';
+import ResModel from './ResModel';
+import * as obj from 'modapp-utils/obj';
+import error, {ResError} from './resError';
+
+const defaultModelType = {
+	id: null,
+	modelFactory: function(api, resourceId, data) {
+		return new ResModel(api, resourceId, data);
+	}
+};
+
+const defaultCollectionFactory = function(api, resourceId, data) {
+	return new ResCollection(api, resourceId, data);
+};
+
+const defaultNamespace    = 'resclient';
+const unsubscribeDelay    = 5000;
+const reconnectDelay      = 3000;
+const subscribeStaleDelay = 2000;
+
+/**
+ * ResClient is a client implemeneting the RES-Client protocol.
+ */
+class ResClient {
+
+	/**
+	 * Creates a ResClient instance
+	 * @param {EventBus} eventBus Event bus
+	 * @param {string} hostUrl Websocket host path. May be relative to current path.
+	 * @param {object} [opt] Optional parameters
+	 * @param {string} [opt.namespace] Event bus namespace. Defaults to 'resclient'.
+	 * @param {function} [opt.onConnect] On connect callback called prior resolving the connect promise and subscribing to stale resources. May return a promise.
+	 */
+	constructor(eventBus, hostUrl, opt) {
+		this.eventBus = eventBus;
+		this.hostUrl = this._resolvePath(hostUrl);
+		obj.update(this, opt, {
+			namespace: { type: 'string', default: defaultNamespace },
+			onConnect: { type: '?function' }
+		});
+
+		this.tryConnect = false;
+		this.connected = false;
+		this.ws = null;
+		this.requests = {};
+		this.reqId = 1; // Incremental request id
+		this.cache = {};
+		this.modelTypes = {};
+		this.stale = null;
+
+		// Queue promises
+		this.connectPromise = null;
+		this.connectCallback = null;
+
+		// Bind callbacks
+		this._handleOnopen = this._handleOnopen.bind(this);
+		this._handleOnerror = this._handleOnerror.bind(this);
+		this._handleOnmessage = this._handleOnmessage.bind(this);
+		this._handleOnclose = this._handleOnclose.bind(this);
+		this._unsubscribeCacheItem = this._unsubscribeCacheItem.bind(this);
+	}
+
+	/**
+	 * Connects the instance to the server.
+	 * Can be called even if a connection is already established.
+	 * @returns {Promise} A promise to the established connection.
+	 */
+	connect() {
+		this.tryConnect = true;
+
+		return this.connectPromise = this.connectPromise || new Promise((resolve, reject) => {
+			this.connectCallback = {resolve, reject};
+			this.ws = new WebSocket(this.hostUrl);
+
+			this.ws.onopen = this._handleOnopen;
+			this.ws.onerror = this._handleOnerror;
+			this.ws.onmessage = this._handleOnmessage;
+			this.ws.onclose = this._handleOnclose;
+		});
+	}
+
+	/**
+	 * Disconnects any current connection and stops attempts
+	 * of reconnecting.
+	 */
+	disconnect() {
+		this.tryConnect = false;
+
+		if (this.ws) {
+			this.ws.close();
+			this._connectReject(new Error("Disconnect called"));
+		}
+	}
+
+	/**
+	 * Attach an  event handler function for one or more instance events.
+	 * @param {?string} events One or more space-separated events. Null means any event.
+	 * @param {Event~eventCallback} handler A function to execute when the event is emitted.
+	 */
+	on(events, handler) {
+		this.eventBus.on(this, events, handler, this.namespace);
+	}
+
+	 /**
+	 * Remove an instance event handler.
+	 * @param {?string} events One or more space-separated events. Null means any event.
+	 * @param {function=} handler An optional handler function. The handler will only be remove if it is the same handler.
+	 */
+	off(events, handler) {
+		this.eventBus.off(this, events, handler, this.namespace);
+	}
+
+	/**
+	 * Sets the onConnect callback.
+	 * @param {?function} onConnect On connect callback called prior resolving the connect promise and subscribing to stale resources. May return a promise.
+	 * @returns {this}
+	 */
+	setOnConnect(onConnect) {
+		this.onConnect = onConnect;
+	}
+
+	/**
+	 * Sends a JsonRpc call to the server
+	 *
+	 * @param {object} method Method name
+	 * @param {object} params Method parameters
+	 */
+	_send(method, params) {
+		return this.connected
+			? this._sendNow(method, params)
+			: this.connect().then(() => this._sendNow(method, params));
+	}
+
+	_sendNow(method, params) {
+		return new Promise((resolve, reject) => {
+			// Prepare request object
+			var req = { id: this.reqId++, method: method, params: params || undefined };
+
+			this.requests[req.id] = {
+				method: method,
+				params: req.params,
+				resolve: resolve,
+				reject: reject
+			};
+
+			var json = JSON.stringify(req);
+			console.log("srv <-- " + req.id + " - " + method + ":", req.params || "");
+			this.ws.send(json);
+		});
+	}
+
+	_call(method, params) {
+		return this.send('instance.' + method, params);
+	}
+
+	/**
+	 * Recieves a incoming json encoded data string and executes the appropriate functions/callbacks.
+	 * @param {string} json Json encoded data
+	 * @private
+	 */
+	_receive(json) {
+		let data = JSON.parse(json.trim());
+
+		if (data.hasOwnProperty('id')) {
+
+			// Find the stored request
+			let req = this.requests[data.id];
+			if (!req) {
+				throw new Error("Server response without matching request");
+			}
+
+			delete this.requests[data.id];
+
+			if (data.hasOwnProperty("error")) {
+				return this._handleErrorResponse(req, data);
+			} else {
+				return this._handleSuccessResponse(req, data);
+			}
+		}
+
+		if (data.hasOwnProperty('event')) {
+			return this._handleEvent(data);
+		}
+
+		throw new Error("Invalid message from server: " + json);
+	}
+
+	_handleErrorResponse(req, data) {
+		console.group("srv --> " + data.id + " - Error");
+		console.log("Error:", data.error);
+
+		try {
+			let err = new ResError(
+				data.error.code,
+				data.error.message,
+				data.error.data,
+				req.method,
+				req.params
+			);
+			try {
+				this._emit('error', err);
+			} catch(ex) {}
+
+			// Execute error callback bound to calling object
+			req.reject(err);
+
+		} finally {
+			console.groupEnd();
+		}
+	}
+
+	_handleSuccessResponse(req, data) {
+		console.group("srv --> " + data.id + " - Response");
+		console.log("Result: ", data.result);
+
+		try {
+			// Execute success callback bound to calling object
+			req.resolve(data.result);
+		} finally {
+			console.groupEnd();
+		}
+	}
+
+	_handleEvent(data) {
+		console.group("srv --> " + data.event);
+		console.log("Data:", data.data);
+
+		try {
+			// Event
+			let idx = data.event.lastIndexOf('.');
+			if (idx < 0 || idx === data.event.length-1) {
+				throw new Error("Malformed event name: " + data.event);
+			}
+
+			let resourceId = data.event.substr(0, idx);
+
+			let cacheItem = this.cache[resourceId];
+			if (!cacheItem) {
+				throw new Error("Resource not found in cache");
+			}
+
+			let event = data.event.substr(idx+1);
+
+			switch (event) {
+			case 'change':
+				this._handleChangeEvent(resourceId, cacheItem, event, data.data);
+				break;
+
+			case 'add':
+				this._handleAddEvent(resourceId, cacheItem, event, data.data);
+				break;
+
+			case 'remove':
+				this._handleRemoveEvent(resourceId, cacheItem, event, data.data);
+				break;
+
+			case 'unsubscribe':
+				this._handleUnsubscribeEvent(resourceId, cacheItem, event);
+				break;
+
+			default:
+				this.eventBus.emit(cacheItem.item, this.namespace+'.resource.'+resourceId+'.'+event, data.data);
+				break;
+			}
+		} finally {
+			console.groupEnd();
+		}
+	}
+
+	_handleChangeEvent(resourceId, cacheItem, event, data) {
+		if (cacheItem.type.change) {
+			cacheItem.type.change(cacheItem.item, data);
+		} else {
+			// Default behaviour
+			let changed = cacheItem.item.__update(data);
+			if (changed) {
+				this.eventBus.emit(cacheItem.item, this.namespace+'.resource.'+resourceId+'.'+event, changed);
+			}
+		}
+	}
+
+	_handleAddEvent(resourceId, cacheItem, event, data) {
+		if (!cacheItem.isCollection) {
+			throw new Error("Add event on model");
+		}
+
+		let modelId = data.resourceId;
+		let cacheModel = this._getCachedModel(data.resourceId, data.data, true);
+		let idx = cacheItem.item.__add(data.resourceId, cacheModel.item, data.idx);
+		this.eventBus.emit(cacheItem.item, this.namespace+'.resource.'+resourceId+'.'+event, {item: cacheModel.item, idx});
+	}
+
+	_handleRemoveEvent(resourceId, cacheItem, event, data) {
+		if (!cacheItem.isCollection) {
+			throw new Error("Remove event on model");
+		}
+
+		let modelId = data.resourceId;
+		let cacheModel = this.cache[modelId];
+		if (!cacheModel) {
+			throw new Error("Removed model is not in cache");
+		}
+
+		let idx = cacheItem.item.__remove(modelId);
+		this.eventBus.emit(cacheItem.item, this.namespace+'.resource.'+resourceId+'.'+event, {item: cacheItem.item, idx});
+
+		let indirect = cacheModel.removeIndirect();
+		// Don't we have a subscription to the model and no indirect references?
+		if (!cacheModel.subscribed && !indirect) {
+			if (cacheModel.direct) {
+				// If there are direct references to the model, the data
+				// should now be considered stale. A new subscription
+				// is triggered.
+				this._setStale(modelId);
+			} else {
+				// If there are no references, just delete it from the cache
+				delete this.cache[modelId];
+			}
+		}
+	}
+
+	_handleUnsubscribeEvent(resourceId, cacheItem, event) {
+		cacheItem.setSubscribed(false);
+		if (cacheItem.direct || cacheItem.indirect) {
+			this._setStale(resourceId);
+		} else {
+			this._removeCacheItem(cacheItem);
+		}
+		this.eventBus.emit(cacheItem.item, this.namespace+'.resource.'+resourceId+'.'+event, {item: cacheItem.item});
+	}
+
+	_setStale(resourceId) {
+		if (!this.connected) {
+			return;
+		}
+
+		setTimeout(() => this._subscribeToStale(resourceId), subscribeStaleDelay);
+	}
+
+	_subscribeToStale(resourceId) {
+		if (!this.connected) {
+			return;
+		}
+
+		// Check for resource in cache
+		let cacheItem = this.cache[resourceId];
+		if (!cacheItem || cacheItem.indirect || cacheItem.subscribed) {
+			return;
+		}
+
+		cacheItem.setSubscribed(true);
+		this._send('subscribe.' + resourceId)
+			.then(response => {
+				// Assert the cacheItem hasn't changed
+				if (cacheItem !== this.cache[resourceId]) {
+					return;
+				}
+
+				if (cacheItem.isCollection !== Array.isArray(response)) {
+					throw new Error("Resource type inconsistency");
+				}
+
+				if (cacheItem.isCollection) {
+					let collection = cacheItem.item;
+					let i = collection.length;
+					let a = new Array(i);
+					while (i--) {
+						a[i] = collection.atIndex(i).resourceId;
+					}
+
+					let b = response.map(m => m.resourceId);
+					this._patchDiff(a, b,
+						(id, m, n, idx) => {
+							if (response[n].data) {
+								this._getCachedModel(id, response[n].data);
+							}
+						},
+						(id, n, idx) => this._handleAddEvent(resourceId, cacheItem, 'add', {
+							resourceId: id,
+							data: response[n].data,
+							idx: idx
+						}),
+						(id, m, idx) => this._handleRemoveEvent(resourceId, cacheItem, 'remove', {
+							resourceId: id
+						})
+					);
+				} else {
+					this._handleChangeEvent(resourceId, cacheItem, 'change', response);
+				}
+
+				cacheItem.promise = null;
+				return cacheItem.item;
+			})
+			.catch(err => {
+				cacheItem.setSubscribed(false);
+
+				if (!cacheItem.subscribed && !cacheItem.indirect && cacheItem.direct) {
+					this._setStale(resourceId);
+				}
+			});
+	}
+
+	_patchDiff(a, b, onKeep, onAdd, onRemove) {
+		// Do a LCS matric calculation
+		// https://en.wikipedia.org/wiki/Longest_common_subsequence_problem
+		let t, i, j, s = 0, aa, bb, m = a.length, n = b.length;
+
+		// Trim of matches at the start and end
+		while (s < m && s < n && a[s] === b[s]) {
+			s++;
+		}
+		while (s <= m && s <= n && a[m-1] === b[n-1]) {
+			m--;
+			n--;
+		}
+
+		if (s > 0 || m < a.length) {
+			aa = a.slice(s, m);
+			m = aa.length;
+		} else {
+			aa = a;
+		}
+		if (s > 0 || n < b.length) {
+			bb = b.slice(s, n);
+			n = bb.length;
+		} else {
+			bb = b;
+		}
+
+		// Create matrix and initialize it
+		let c = new Array(m+1);
+		for (i = 0; i <= m; i++) {
+			c[i] = t = new Array(n+1);
+			t[0] = 0;
+		}
+		t = c[0];
+		for (j = 1; j <= n; j++) {
+			t[j] = 0;
+		}
+
+		for (i = 0; i < m; i++) {
+			for (j = 0; j < n; j++) {
+				c[i+1][j+1] = aa[i] === bb[j]
+					? c[i][j]+1
+					: Math.max(c[i+1][j], c[i][j+1]);
+			}
+		}
+
+		for (i = a.length-1; i >= s+m; i--) {
+			onKeep(a[i], i, i-m+n, i);
+		}
+		let idx = m+s;
+		i = m;
+		j = n;
+		let r = 0;
+		let adds = [];
+		while (true) {
+			m = i-1;
+			n = j-1;
+			if (i > 0 && j > 0 && aa[m] === bb[n]) {
+				onKeep(aa[m], m+s, n+s, --idx);
+				i--;
+				j--;
+			} else if (j > 0 && (i === 0 || c[i][n] >= c[m][j])) {
+				adds.push([n, idx, r]);
+				j--;
+			} else if (i > 0 && (j === 0 || c[i][n] < c[m][j])) {
+				onRemove(aa[m], m+s, --idx);
+				r++;
+				i--;
+			} else {
+				break;
+			}
+		}
+		for (i = s-1; i >= 0; i--) {
+			onKeep(a[i], i, i, i);
+		}
+
+		// Do the adds
+		let len = adds.length - 1;
+		for (i = len; i >= 0; i--) {
+			[n, idx, j] = adds[i];
+			onAdd(bb[n], n+s, idx-r+j+len-i);
+		}
+	}
+
+	_subscribeToAllStale() {
+		for (let resourceId in this.cache) {
+			this._subscribeToStale(resourceId);
+		}
+	}
+
+	/**
+	 * Handles the websocket onopen event
+	 * @private
+	 */
+	_handleOnopen(e) {
+		this.connected = true;
+
+		Promise.resolve(this.onConnect ? this.onConnect() : null)
+			.then(() => {
+				console.log("Connected");
+				this._subscribeToAllStale();
+				this._emit('connect', e);
+				this._connectResolve();
+			})
+			.catch(err => {
+				console.log("Error in onConnect callback: ", err);
+				if (this.ws) {
+					this.ws.close();
+				}
+			});
+	}
+
+	/**
+	 * Handles the websocket onerror event
+	 * @param {*} e Event
+	 * @private
+	 */
+	_handleOnerror(e) {
+		this._connectReject(e);
+	}
+
+	/**
+	 * Handles the websocket onmessage event
+	 * @private
+	 */
+	_handleOnmessage(e) {
+		this._receive(e.data);
+	}
+
+	/**
+	 * Handles the websocket onclose event
+	 * @private
+	 */
+	_handleOnclose(e) {
+		this.connectPromise = null;
+		this.ws = null;
+		if (this.connected) {
+			this.connected = false;
+			this._emit('close', e);
+		}
+
+		// Set any item in cache to stale
+		for (let id in this.cache) {
+			this.cache[id].setSubscribed(false);
+		}
+
+		if (this.tryConnect) {
+			this._reconnect();
+		}
+	}
+
+	/**
+	 * Resolves the connection promise
+	 * @private
+	 */
+	_connectResolve() {
+		if (this.connectCallback) {
+			this.connectCallback.resolve();
+			this.connectCallback = null;
+		}
+	}
+
+	/**
+	 * Rejects the connection promise
+	 * @param {*} e Error event
+	 */
+	_connectReject(e) {
+		this.connectPromise = null;
+		this.ws = null;
+
+		if (this.connectCallback) {
+			this.connectCallback.reject(e);
+			this.connectCallback = null;
+		}
+	}
+
+	/**
+	 * Emits an event
+	 * @private
+	 */
+	_emit(event, data, ctx) {
+		this.eventBus.emit(event, data, this.namespace);
+	}
+
+
+	/**
+	 * Model factory callback for the Model Type
+	 * @callback module/Api~modelFactoryCallback
+	 * @param {module/Api} api Api module
+	 * @param {string} resourceId Resource id of model
+	 * @param {object} data Model data
+	 */
+
+	/**
+	 * Model type definition object
+	 * @typedef {object} module/Api~ModelType
+	 * @property {string} id Id of model type. Should be service name and type name. Eg. 'userService.user'
+	 * @property {module/Api~modelFactoryCallback} modelFactory Model factory callback
+	 */
+
+	/**
+	 * Register a model type
+	 * @param {module/Api~ModelType} modelType Model type definition object
+	 */
+	registerModelType(modelType) {
+		if (this.modelTypes[modelType.id]) {
+			throw new Error(`Model type ${modeType.id} already registered`);
+		}
+
+		if (!modelType.id || !modelType.id.match(/^[^\.]+\.[^\.]+$/)) {
+			throw new Error(`Invalid model type id: ${modelType.id}`);
+		}
+
+		this.modelTypes[modelType.id] = modelType;
+	}
+
+	/**
+	 * Unregister a model type
+	 * @param {string} modelTypeId Id of model type
+	 * @returns {?object} Model type definition object, or null if it wasn't registered
+	 */
+	unregisterModelType(modelTypeId) {
+		let modelType = this.modelTypes[modelTypeId];
+
+		if (!modelType) {
+			return null;
+		}
+
+		delete this.modelTypes[modelTypeId];
+		return modelType;
+	}
+
+	/**
+	 * Get a resource from the backend
+	 * @param {string} resource Resource name
+	 * @param {object} [opt] Optional parameters
+	 * @return {Promise.<Model|Collection>} Promise of the resourcce
+	 */
+	getResource(resourceId, collectionFactory = defaultCollectionFactory) {
+		// Check for resource in cache
+		let cacheItem = this.cache[resourceId];
+		if (cacheItem) {
+			return cacheItem.promise ? cacheItem.promise : Promise.resolve(cacheItem.item);
+		}
+
+		cacheItem = new CacheItem(resourceId, this._unsubscribeCacheItem).setSubscribed(true);
+		cacheItem.setPromise(this._send('subscribe.' + resourceId)
+			.then(response => {
+				if (Array.isArray(response)) {
+					let modelConts = response.map(m => {
+						let cacheModel = this._getCachedModel(m.resourceId, m.data, true);
+						return {
+							resourceId: m.resourceId,
+							model: cacheModel.item
+						};
+					});
+
+					cacheItem.setItem(collectionFactory(this, resourceId, modelConts));
+					cacheItem.setIsCollection();
+				} else {
+					let modelType = this._getModelType(resourceId);
+					cacheItem.setItem(modelType.modelFactory(
+						this,
+						resourceId,
+						response
+					)).setType(modelType);
+				}
+
+				cacheItem.promise = null;
+				return cacheItem.item;
+			})
+			.catch(err => {
+				// Do not cache an error
+				cacheItem.setSubscribed(false);
+				delete this.cache[resourceId];
+				throw err;
+			})
+		);
+
+		this.cache[resourceId] = cacheItem;
+		return cacheItem.promise;
+	}
+
+	/**
+	 * Create a new model resource
+	 * @param {string} collectionId Existing collection in which the resource is to be created
+	 * @param {?object} props Model properties
+	 * @returns {Promise.<Model>} Promise of the created model
+	 */
+	createModel(collectionId, props) {
+		return this._send('new.' + collectionId, props).then(response => {
+			let cacheModel = this._getCachedModel(response.resourceId, response.data);
+			cacheModel.setSubscribed(true);
+			return cacheModel.item;
+		});
+	}
+
+	removeModel(collectionId, resourceId) {
+		return this._send('delete.' + collectionId, {resourceId});
+	}
+
+	setModel(modelId, props) {
+		return this._send('call.' + modelId + '.set', props);
+	}
+
+	callModel(modelId, method, params) {
+		return this._send('call.' + modelId + '.' + method, params);
+	}
+
+	authenticate(resourceId, method, params) {
+		return this._send('auth.' + resourceId + '.' + method, params);
+	}
+
+	resourceOn(resourceId, events, handler) {
+		let cacheItem = this.cache[resourceId];
+		if (!cacheItem) {
+			throw new Error("Resource not found in cache: "+ resourceId);
+		}
+
+		cacheItem.addDirect();
+		this.eventBus.on(cacheItem.item, events, handler, this.namespace+'.resource.'+resourceId);
+	}
+
+	resourceOff(resourceId, events, handler) {
+		let cacheItem = this.cache[resourceId];
+		if (!cacheItem) {
+			throw new Error("Resource not found in cache");
+		}
+
+		cacheItem.removeDirect();
+		this.eventBus.off(cacheItem.item, events, handler, this.namespace+'.resource.'+resourceId);
+	}
+
+	_unsubscribeCacheItem(cacheItem) {
+		let subscribed = cacheItem.subscribed;
+
+		if (cacheItem.isCollection && this.connected) {
+			this._subscribeDirectCollectionModels(cacheItem, subscribed);
+		}
+
+		if (subscribed) {
+			cacheItem.setSubscribed(false);
+		}
+
+		if (this.connected && subscribed) {
+			this._send('unsubscribe.' + cacheItem.resourceId).then(() => {
+				this._removeCacheItem(cacheItem);
+			});
+		} else {
+			this._removeCacheItem(cacheItem);
+		}
+	}
+
+	_subscribeDirectCollectionModels(cacheItem, subscribed) {
+		let item = cacheItem.item, cacheModel;
+		for (let model of item) {
+			let modelId = model.resourceId;
+			cacheModel = this.cache[modelId];
+			if (!cacheModel) {
+				throw "Collection model not found in cache";
+			}
+
+			// Are we missing an existing subscription to the model?
+			if (!cacheModel.subscribed && cacheModel.direct) {
+				if (subscribed) {
+					cacheModel.setSubscribed(true);
+					this._send('subscribe.' + modelId);
+				} else {
+					this._setStale(modelId);
+				}
+
+			}
+		}
+	}
+
+	_removeCacheItem(cacheItem) {
+		if (cacheItem.subscribed || cacheItem.indirect) {
+			return;
+		}
+
+		let item = cacheItem.item, cacheModel;
+		if (cacheItem.isCollection) {
+			for (let model of item) {
+				let modelId = model.resourceId;
+				cacheModel = this.cache[modelId];
+				if (!cacheModel) {
+					throw "Collection model not found in cache";
+				}
+
+				let indirect = cacheModel.removeIndirect();
+				// Are we missing an existing subscription to the model?
+				if (!indirect && !cacheModel.direct) {
+					// If there are no references, just delete it from the cache
+					delete this.cache[modelId];
+				}
+			}
+		}
+
+		delete this.cache[cacheItem.resourceId];
+	}
+
+	_getCachedModel(resourceId, data, addIndirect = false) {
+		let cacheItem = this.cache[resourceId];
+		if (cacheItem) {
+			// A data object on existing cacheItem indicates
+			// the item is stale and we should update it.
+			if (data) {
+				this._handleChangeEvent(resourceId, cacheItem, 'change', data);
+			}
+			if (addIndirect) {
+				cacheItem.addIndirect();
+			}
+		} else {
+			let modelType = this._getModelType(resourceId);
+			cacheItem = new CacheItem(resourceId, this._unsubscribeCacheItem);
+			if (addIndirect) {
+				cacheItem.addIndirect();
+			}
+			cacheItem
+				.setItem(modelType.modelFactory(
+					this,
+					resourceId,
+					data
+				))
+				.setType(modelType);
+
+			this.cache[resourceId] = cacheItem;
+		}
+
+		return cacheItem;
+	}
+
+	_getModelType(resourceName) {
+		let l = resourceName.length, n = 2, i = -1;
+		while (n-- && i++ < l){
+			i = resourceName.indexOf('.', i);
+			if (i < 0) {
+				i = resourceName.length;
+				break;
+			}
+		}
+
+		let typeName = resourceName.substr(0, i);
+
+		return this.modelTypes[typeName] || defaultModelType;
+	}
+
+	_reconnect() {
+		setTimeout(() => {
+			if (!this.tryConnect) {
+				return;
+			}
+
+			this.connect();
+		}, reconnectDelay);
+	}
+
+	_resolvePath(url) {
+		if (url.match(/^wss?:\/\//)) {
+			return url;
+		}
+
+		let a = document.createElement('a');
+		a.href = url;
+
+		return a.href.replace(/^http/, 'ws');
+	}
+}
+
+export default ResClient;

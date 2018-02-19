@@ -1,0 +1,8 @@
+/node_modules
+/coverage
+/package-lock.json
+
+# Build files.
+# Put in root folder
+/class
+/*.js
