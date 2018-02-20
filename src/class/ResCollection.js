@@ -1,4 +1,4 @@
-import SortedMap from 'class/SortedMap';
+import SortedMap from 'modapp-resource/SortedMap';
 import * as obj from 'modapp-utils/obj';
 
 /**
