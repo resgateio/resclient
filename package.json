@@ -1,6 +1,6 @@
 {
   "name": "resclient",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Client implementation of the RES-Client Protocol.",
   "main": "./index.js",
   "scripts": {
