@@ -6,8 +6,8 @@ class CacheItem {
 	 * Creats a CacheItem instance
 	 * @param {function} unsubCallback Unsubscribe callback
 	 */
-	constructor(resourceId, unsubCallback) {
-		this.resourceId = resourceId;
+	constructor(rid, unsubCallback) {
+		this.rid = rid;
 		this._unsubCallback = unsubCallback;
 
 		this.item = null;

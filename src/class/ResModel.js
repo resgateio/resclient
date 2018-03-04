@@ -1,7 +1,8 @@
 import * as obj from 'modapp-utils/obj';
 
 /**
- * ResModel holds a model provided over the RES API, and implements modapp's Model interface
+ * ResModel holds a model provided over the RES API.
+ * @implements {module:modapp~Model}
  */
 class ResModel {
 
@@ -23,9 +24,10 @@ class ResModel {
 	}
 
 	/**
-	 * Model resource id
+	 * Model resource ID
+	 * @returns {string} Resource ID
 	 */
-	get resourceId() {
+	getResourceId() {
 		return this._rid;
 	}
 

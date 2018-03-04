@@ -2,7 +2,8 @@ import SortedMap from 'modapp-resource/SortedMap';
 import * as obj from 'modapp-utils/obj';
 
 /**
- * ResModel holds a collection provided over the RES API, and implements modapp's Collection interface
+ * ResModel holds a collection provided over the RES API.
+ * @implements {module:modapp~Collection}
  */
 class ResCollection {
 
@@ -31,18 +32,19 @@ class ResCollection {
 		// Populate map with initial data
 		if (data) {
 			for (let cont of data) {
-				this._map.add(cont.resourceId, cont.model);
+				this._map.add(cont.rid, cont.model);
 				if (this._idAttribute) {
-					this._modelResources[this._idAttribute(cont.model)] = resourceId;
+					this._modelResources[this._idAttribute(cont.model)] = rid;
 				}
 			}
 		}
 	}
 
 	/**
-	 * Collection resource id
+	 * Collection resource ID
+	 * @returns {string} Resource ID
 	 */
-	get resourceId() {
+	getResourceId() {
 		return this._rid;
 	}
 
@@ -83,8 +85,8 @@ class ResCollection {
 	 * @returns {*} Stored model. Undefined if key doesn't exist
 	 */
 	get(id) {
-		let resourceId = this._idAttribute ? this._modelResources[id] : id;
-		return this._map.get(resourceId);
+		let rid = this._idAttribute ? this._modelResources[id] : id;
+		return this._map.get(rid);
 	}
 
 	/**
