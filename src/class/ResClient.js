@@ -3,7 +3,7 @@ import ResCollection from './ResCollection';
 import ResModel from './ResModel';
 import eventBus from 'modapp/eventBus';
 import * as obj from 'modapp-utils/obj';
-import error, {ResError} from './resError';
+import { ResError } from './resError';
 
 const defaultModelType = {
 	id: null,
@@ -16,13 +16,12 @@ const defaultCollectionFactory = function(api, rid, data) {
 	return new ResCollection(api, rid, data);
 };
 
-const defaultNamespace    = 'resclient';
-const unsubscribeDelay    = 5000;
-const reconnectDelay      = 3000;
+const defaultNamespace = 'resclient';
+const reconnectDelay = 3000;
 const subscribeStaleDelay = 2000;
 
 /**
- * ResClient is a client implemeneting the RES-Client protocol.
+ * ResClient is a client implementing the RES-Client protocol.
  */
 class ResClient {
 
@@ -72,7 +71,7 @@ class ResClient {
 		this.tryConnect = true;
 
 		return this.connectPromise = this.connectPromise || new Promise((resolve, reject) => {
-			this.connectCallback = {resolve, reject};
+			this.connectCallback = { resolve, reject };
 			this.ws = new WebSocket(this.hostUrl);
 
 			this.ws.onopen = this._handleOnopen;
@@ -120,13 +119,15 @@ class ResClient {
 	 */
 	setOnConnect(onConnect) {
 		this.onConnect = onConnect;
+		return this;
 	}
 
 	/**
 	 * Sends a JsonRpc call to the server
-	 *
 	 * @param {object} method Method name
 	 * @param {object} params Method parameters
+	 * @returns {Promise.<object>} Promise to the response
+	 * @private
 	 */
 	_send(method, params) {
 		return this.connected
@@ -175,17 +176,15 @@ class ResClient {
 			delete this.requests[data.id];
 
 			if (data.hasOwnProperty("error")) {
-				return this._handleErrorResponse(req, data);
+				this._handleErrorResponse(req, data);
 			} else {
-				return this._handleSuccessResponse(req, data);
+				this._handleSuccessResponse(req, data);
 			}
+		} else if (data.hasOwnProperty('event')) {
+			this._handleEvent(data);
+		} else {
+			throw new Error("Invalid message from server: " + json);
 		}
-
-		if (data.hasOwnProperty('event')) {
-			return this._handleEvent(data);
-		}
-
-		throw new Error("Invalid message from server: " + json);
 	}
 
 	_handleErrorResponse(req, data) {
@@ -202,7 +201,7 @@ class ResClient {
 			);
 			try {
 				this._emit('error', err);
-			} catch(ex) {}
+			} catch (ex) {}
 
 			// Execute error callback bound to calling object
 			req.reject(err);
@@ -231,7 +230,7 @@ class ResClient {
 		try {
 			// Event
 			let idx = data.event.lastIndexOf('.');
-			if (idx < 0 || idx === data.event.length-1) {
+			if (idx < 0 || idx === data.event.length - 1) {
 				throw new Error("Malformed event name: " + data.event);
 			}
 
@@ -242,28 +241,28 @@ class ResClient {
 				throw new Error("Resource not found in cache");
 			}
 
-			let event = data.event.substr(idx+1);
+			let event = data.event.substr(idx + 1);
 
 			switch (event) {
-			case 'change':
-				this._handleChangeEvent(rid, cacheItem, event, data.data);
-				break;
+				case 'change':
+					this._handleChangeEvent(rid, cacheItem, event, data.data);
+					break;
 
-			case 'add':
-				this._handleAddEvent(rid, cacheItem, event, data.data);
-				break;
+				case 'add':
+					this._handleAddEvent(rid, cacheItem, event, data.data);
+					break;
 
-			case 'remove':
-				this._handleRemoveEvent(rid, cacheItem, event, data.data);
-				break;
+				case 'remove':
+					this._handleRemoveEvent(rid, cacheItem, event, data.data);
+					break;
 
-			case 'unsubscribe':
-				this._handleUnsubscribeEvent(rid, cacheItem, event);
-				break;
+				case 'unsubscribe':
+					this._handleUnsubscribeEvent(rid, cacheItem, event);
+					break;
 
-			default:
-				this.eventBus.emit(cacheItem.item, this.namespace+'.resource.'+rid+'.'+event, data.data);
-				break;
+				default:
+					this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + rid + '.' + event, data.data);
+					break;
 			}
 		} finally {
 			console.groupEnd();
@@ -277,7 +276,7 @@ class ResClient {
 			// Default behaviour
 			let changed = cacheItem.item.__update(data);
 			if (changed) {
-				this.eventBus.emit(cacheItem.item, this.namespace+'.resource.'+rid+'.'+event, changed);
+				this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + rid + '.' + event, changed);
 			}
 		}
 	}
@@ -290,7 +289,7 @@ class ResClient {
 		let modelId = data.rid;
 		let cacheModel = this._getCachedModel(modelId, data.data, true);
 		let idx = cacheItem.item.__add(modelId, cacheModel.item, data.idx);
-		this.eventBus.emit(cacheItem.item, this.namespace+'.resource.'+rid+'.'+event, {item: cacheModel.item, idx});
+		this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + rid + '.' + event, { item: cacheModel.item, idx });
 	}
 
 	_handleRemoveEvent(rid, cacheItem, event, data) {
@@ -305,7 +304,7 @@ class ResClient {
 		}
 
 		let idx = cacheItem.item.__remove(modelId);
-		this.eventBus.emit(cacheItem.item, this.namespace+'.resource.'+rid+'.'+event, {item: cacheItem.item, idx});
+		this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + rid + '.' + event, { item: cacheItem.item, idx });
 
 		let indirect = cacheModel.removeIndirect();
 		// Don't we have a subscription to the model and no indirect references?
@@ -329,7 +328,7 @@ class ResClient {
 		} else {
 			this._removeCacheItem(cacheItem);
 		}
-		this.eventBus.emit(cacheItem.item, this.namespace+'.resource.'+rid+'.'+event, {item: cacheItem.item});
+		this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + rid + '.' + event, { item: cacheItem.item });
 	}
 
 	_setStale(rid) {
@@ -412,7 +411,7 @@ class ResClient {
 		while (s < m && s < n && a[s] === b[s]) {
 			s++;
 		}
-		while (s <= m && s <= n && a[m-1] === b[n-1]) {
+		while (s <= m && s <= n && a[m - 1] === b[n - 1]) {
 			m--;
 			n--;
 		}
@@ -431,9 +430,9 @@ class ResClient {
 		}
 
 		// Create matrix and initialize it
-		let c = new Array(m+1);
+		let c = new Array(m + 1);
 		for (i = 0; i <= m; i++) {
-			c[i] = t = new Array(n+1);
+			c[i] = t = new Array(n + 1);
 			t[0] = 0;
 		}
 		t = c[0];
@@ -443,47 +442,47 @@ class ResClient {
 
 		for (i = 0; i < m; i++) {
 			for (j = 0; j < n; j++) {
-				c[i+1][j+1] = aa[i] === bb[j]
-					? c[i][j]+1
-					: Math.max(c[i+1][j], c[i][j+1]);
+				c[i + 1][j + 1] = aa[i] === bb[j]
+					? c[i][j] + 1
+					: Math.max(c[i + 1][j], c[i][j + 1]);
 			}
 		}
 
-		for (i = a.length-1; i >= s+m; i--) {
-			onKeep(a[i], i, i-m+n, i);
+		for (i = a.length - 1; i >= s + m; i--) {
+			onKeep(a[i], i, i - m + n, i);
 		}
-		let idx = m+s;
+		let idx = m + s;
 		i = m;
 		j = n;
 		let r = 0;
 		let adds = [];
 		while (true) {
-			m = i-1;
-			n = j-1;
+			m = i - 1;
+			n = j - 1;
 			if (i > 0 && j > 0 && aa[m] === bb[n]) {
-				onKeep(aa[m], m+s, n+s, --idx);
+				onKeep(aa[m], m + s, n + s, --idx);
 				i--;
 				j--;
 			} else if (j > 0 && (i === 0 || c[i][n] >= c[m][j])) {
-				adds.push([n, idx, r]);
+				adds.push([ n, idx, r ]);
 				j--;
 			} else if (i > 0 && (j === 0 || c[i][n] < c[m][j])) {
-				onRemove(aa[m], m+s, --idx);
+				onRemove(aa[m], m + s, --idx);
 				r++;
 				i--;
 			} else {
 				break;
 			}
 		}
-		for (i = s-1; i >= 0; i--) {
+		for (i = s - 1; i >= 0; i--) {
 			onKeep(a[i], i, i, i);
 		}
 
 		// Do the adds
 		let len = adds.length - 1;
 		for (i = len; i >= 0; i--) {
-			[n, idx, j] = adds[i];
-			onAdd(bb[n], n+s, idx-r+j+len-i);
+			[ n, idx, j ] = adds[i];
+			onAdd(bb[n], n + s, idx - r + j + len - i);
 		}
 	}
 
@@ -495,6 +494,7 @@ class ResClient {
 
 	/**
 	 * Handles the websocket onopen event
+	 * @param {object} e Open event object
 	 * @private
 	 */
 	_handleOnopen(e) {
@@ -517,7 +517,7 @@ class ResClient {
 
 	/**
 	 * Handles the websocket onerror event
-	 * @param {*} e Event
+	 * @param {object} e Error event object
 	 * @private
 	 */
 	_handleOnerror(e) {
@@ -526,6 +526,7 @@ class ResClient {
 
 	/**
 	 * Handles the websocket onmessage event
+	 * @param {object} e Message event object
 	 * @private
 	 */
 	_handleOnmessage(e) {
@@ -534,6 +535,7 @@ class ResClient {
 
 	/**
 	 * Handles the websocket onclose event
+	 * @param {object} e Close event object
 	 * @private
 	 */
 	_handleOnclose(e) {
@@ -579,14 +581,9 @@ class ResClient {
 		}
 	}
 
-	/**
-	 * Emits an event
-	 * @private
-	 */
 	_emit(event, data, ctx) {
 		this.eventBus.emit(event, data, this.namespace);
 	}
-
 
 	/**
 	 * Model factory callback for the Model Type
@@ -612,7 +609,7 @@ class ResClient {
 			throw new Error(`Model type ${modeType.id} already registered`);
 		}
 
-		if (!modelType.id || !modelType.id.match(/^[^\.]+\.[^\.]+$/)) {
+		if (!modelType.id || !modelType.id.match(/^[^.]+\.[^.]+$/)) {
 			throw new Error(`Invalid model type id: ${modelType.id}`);
 		}
 
@@ -637,8 +634,8 @@ class ResClient {
 
 	/**
 	 * Get a resource from the backend
-	 * @param {string} resource Resource name
-	 * @param {object} [opt] Optional parameters
+	 * @param {string} rid Resource ID
+	 * @param {function} [collectionFactory] Collection factory function.
 	 * @return {Promise.<Model|Collection>} Promise of the resourcce
 	 */
 	getResource(rid, collectionFactory = defaultCollectionFactory) {
@@ -701,7 +698,7 @@ class ResClient {
 	}
 
 	removeModel(collectionId, rid) {
-		return this._send('delete.' + collectionId, {rid});
+		return this._send('delete.' + collectionId, { rid });
 	}
 
 	setModel(modelId, props) {
@@ -719,11 +716,11 @@ class ResClient {
 	resourceOn(rid, events, handler) {
 		let cacheItem = this.cache[rid];
 		if (!cacheItem) {
-			throw new Error("Resource not found in cache: "+ rid);
+			throw new Error("Resource not found in cache: " + rid);
 		}
 
 		cacheItem.addDirect();
-		this.eventBus.on(cacheItem.item, events, handler, this.namespace+'.resource.'+rid);
+		this.eventBus.on(cacheItem.item, events, handler, this.namespace + '.resource.' + rid);
 	}
 
 	resourceOff(rid, events, handler) {
@@ -733,7 +730,7 @@ class ResClient {
 		}
 
 		cacheItem.removeDirect();
-		this.eventBus.off(cacheItem.item, events, handler, this.namespace+'.resource.'+rid);
+		this.eventBus.off(cacheItem.item, events, handler, this.namespace + '.resource.' + rid);
 	}
 
 	_unsubscribeCacheItem(cacheItem) {

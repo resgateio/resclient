@@ -7,10 +7,12 @@ import * as obj from 'modapp-utils/obj';
 class ResModel {
 
 	/**
-	 * Creats an ResModel instance
+	 * Creates a ResModel instance
 	 * @param {ResClient} api ResClient instance
 	 * @param {string} rid Resource id.
-	 * @param {object} [data] Data object
+	 * @param {object} data Data object
+	 * @param {object} [opt] Optional parameters.
+	 * @param {object} [opt.definition] Object definition. If not provided, any value will be allowed.
 	 */
 	constructor(api, rid, data, opt) {
 		obj.update(this, opt, {
@@ -92,7 +94,7 @@ class ResModel {
 		} else {
 			for (let key in props) {
 				if (props.hasOwnProperty(key) &&
-					key.substr(0,1) !== '_' &&
+					key.substr(0, 1) !== '_' &&
 					(this.hasOwnProperty(key) || !this[key])
 				) {
 					if (props[key] !== this[key]) {
@@ -114,7 +116,7 @@ class ResModel {
 			let obj = {};
 			for (let key in this) {
 				if (this.hasOwnProperty(key) &&
-					key.substr(0,1) !== '_'
+					key.substr(0, 1) !== '_'
 				) {
 					obj[key] = this[key];
 				}
@@ -124,4 +126,4 @@ class ResModel {
 	}
 }
 
-export default  ResModel;
+export default ResModel;

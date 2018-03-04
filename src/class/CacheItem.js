@@ -4,6 +4,7 @@ class CacheItem {
 
 	/**
 	 * Creats a CacheItem instance
+	 * @param {string} rid Resource ID
 	 * @param {function} unsubCallback Unsubscribe callback
 	 */
 	constructor(rid, unsubCallback) {

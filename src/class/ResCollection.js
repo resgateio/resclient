@@ -11,8 +11,8 @@ class ResCollection {
 	 * Creats an ResCollection instance
 	 * @param {ResClient} api ResClient instance
 	 * @param {string} rid Resource id.
+	 * @param {Array.<object>} data ResCollection data array
 	 * @param {object} [opt] Optional settings
-	 * @param {Array.<object>} [opt.data] ResCollection data array
 	 * @param {function} [opt.compare] Compare function for sort order. Defaults to insert order.
 	 * @param {function} [opt.idAttribute] Id attribute callback function. Defaults to returning the object.id property.
 	 */
