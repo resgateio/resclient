@@ -20,6 +20,7 @@
     "eslint": "^4.18.2"
   },
   "dependencies": {
+    "modapp": "^2.1.3",
     "modapp-resource": "^1.0.2",
     "modapp-utils": "^1.0.1"
   }
