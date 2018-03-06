@@ -1,7 +1,7 @@
 import * as obj from 'modapp-utils/obj';
 
 /**
- * ResModel holds a model provided over the RES API.
+ * ResModel represents a model provided over the RES API.
  * @implements {module:modapp~Model}
  */
 class ResModel {
@@ -34,10 +34,10 @@ class ResModel {
 	}
 
 	/**
-	 * Attach an event handler function for one or more instance events.
-	 * Available event is 'change'
+	 * Attach a model event handler function for one or more events.
+	 * Available event is 'change'.
 	 * @param {?string} events One or more space-separated events. Null means any event.
-	 * @param {EventBus~eventCallback} [handler] A function to execute when the event is emitted.
+	 * @param {eventCallback} [handler] Handler function to execute when the event is emitted.
 	 * @returns {this}
 	 */
 	on(events, handler) {
@@ -46,10 +46,10 @@ class ResModel {
 	}
 
 	 /**
-	 * Remove an instance event handler.
-	 * Available event is 'change'
+	 * Remove a model event handler function.
+	 * Available event is 'change'.
 	 * @param {?string} events One or more space-separated events. Null means any event.
-	 * @param {EventBus~eventCallback} [handler] An option handler function. The handler will only be remove if it is the same handler.
+	 * @param {eventCallback} [handler] Handler function to remove.
 	 * @returns {this}
 	 */
 	off(events, handler) {
@@ -58,17 +58,17 @@ class ResModel {
 	}
 
 	/**
-	 * Sets properties at the backend
+	 * Calls the set method to update model properties.
 	 * @param {object} props Properties
-	 * @returns {Promise.<object>} Promise of the changed properties.
+	 * @returns {Promise.<object>} Promise of the call being completed.
 	 */
 	set(props) {
 		return this._api.setModel(this._rid, props);
 	}
 
 	/**
-	 * Calls a method on the model at the backend
-	 * @param {*} method Method
+	 * Calls a method on the model.
+	 * @param {string} method Method name
 	 * @param {*} params Method parameters
 	 * @returns {Promise.<object>} Promise of the call result.
 	 */
@@ -78,7 +78,7 @@ class ResModel {
 
 	/**
 	 * Updates the model.
-	 * Should only be called from api module.
+	 * Should only be called by the resClient instance.
 	 * @param {object} props Properties to update
 	 * @returns {?object} Changed properties
 	 * @private

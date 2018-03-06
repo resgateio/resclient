@@ -31,7 +31,7 @@ class ResClient {
 	 * @param {object} [opt] Optional parameters.
 	 * @param {function} [opt.onConnect] On connect callback called prior resolving the connect promise and subscribing to stale resources. May return a promise.
 	 * @param {string} [opt.namespace] Event bus namespace. Defaults to 'resclient'.
-	 * @param {EventBus} [opt.eventBus] Event bus.
+	 * @param {module:modapp/ext~EventBus} [opt.eventBus] Event bus.
 	 */
 	constructor(hostUrl, opt) {
 		this.hostUrl = this._resolvePath(hostUrl);
@@ -97,7 +97,7 @@ class ResClient {
 	/**
 	 * Attach an  event handler function for one or more instance events.
 	 * @param {?string} events One or more space-separated events. Null means any event.
-	 * @param {Event~eventCallback} handler A function to execute when the event is emitted.
+	 * @param {eventCallback} handler A function to execute when the event is emitted.
 	 */
 	on(events, handler) {
 		this.eventBus.on(this, events, handler, this.namespace);
@@ -106,7 +106,7 @@ class ResClient {
 	 /**
 	 * Remove an instance event handler.
 	 * @param {?string} events One or more space-separated events. Null means any event.
-	 * @param {function=} handler An optional handler function. The handler will only be remove if it is the same handler.
+	 * @param {eventCallback} [handler] An optional handler function. The handler will only be remove if it is the same handler.
 	 */
 	off(events, handler) {
 		this.eventBus.off(this, events, handler, this.namespace);
@@ -570,6 +570,7 @@ class ResClient {
 	/**
 	 * Rejects the connection promise
 	 * @param {*} e Error event
+	 * @private
 	 */
 	_connectReject(e) {
 		this.connectPromise = null;

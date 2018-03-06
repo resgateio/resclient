@@ -3,7 +3,7 @@ const unsubscribeDelay = 5000; // ms
 class CacheItem {
 
 	/**
-	 * Creats a CacheItem instance
+	 * Creates a CacheItem instance
 	 * @param {string} rid Resource ID
 	 * @param {function} unsubCallback Unsubscribe callback
 	 */

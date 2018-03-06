@@ -1,4 +1,5 @@
 src
+def
 coverage
 package-lock.json
 *.test.js

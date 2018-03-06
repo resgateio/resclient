@@ -3,6 +3,8 @@
 # RES Client
 Javascript client implementing the RES-Client Protocol.
 
+The client is used to connect to a RES API. For more information about the RES protocol, visit the [resgate](https://github.com/jirenius/resgate).
+
 ## Installation
 
 With npm:
@@ -20,14 +22,12 @@ yarn add resclient
 Javascript client:
 ```
 npm install resclient
-npm install modapp
 ```
 
 ```javascript
 import ResClient from 'resclient';
-import eventBus from 'modapp/eventBus';
 
-const client = new ResClient(eventBus, 'ws://localhost:8080/ws');
+const client = new ResClient('ws://localhost:8080/ws');
 
 client.getResource('exampleService.myModel').then(model => {
 	alert(model.message);
@@ -38,3 +38,7 @@ client.getResource('exampleService.myModel').then(model => {
 	setTimeout(() => model.off('change', onChange), 5000);
 });
 ```
+
+## Documentation
+
+[Markdown documentation](https://github.com/jirenius/resclient/blob/master/docs/docs.md)

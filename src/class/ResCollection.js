@@ -2,13 +2,13 @@ import SortedMap from 'modapp-resource/SortedMap';
 import * as obj from 'modapp-utils/obj';
 
 /**
- * ResModel holds a collection provided over the RES API.
+ * ResCollection represents a collection provided over the RES API.
  * @implements {module:modapp~Collection}
  */
 class ResCollection {
 
 	/**
-	 * Creats an ResCollection instance
+	 * Creates an ResCollection instance
 	 * @param {ResClient} api ResClient instance
 	 * @param {string} rid Resource id.
 	 * @param {Array.<object>} data ResCollection data array
@@ -56,10 +56,10 @@ class ResCollection {
 	}
 
 	/**
-	 * Attach an event handler function for one or more instance events.
+	 * Attach a collection event handler function for one or more events.
 	 * Available events are 'add', 'remove', and 'move'.
 	 * @param {?string} events One or more space-separated events. Null means any event.
-	 * @param {EventBus~eventCallback} [handler] A function to execute when the event is emitted.
+	 * @param {eventCallback} [handler] Handler function to execute when the event is emitted.
 	 * @returns {this}
 	 */
 	on(events, handler) {
@@ -68,10 +68,10 @@ class ResCollection {
 	}
 
 	 /**
-	 * Remove an instance event handler.
+	 * Remove a collection event handler function.
 	 * Available events are 'add', 'remove', and 'move'.
 	 * @param {?string} events One or more space-separated events. Null means any event.
-	 * @param {EventBus~eventCallback} [handler] An option handler function. The handler will only be remove if it is the same handler.
+	 * @param {eventCallback} [handler] Handler function to remove.
 	 * @returns {this}
 	 */
 	off(events, handler) {
@@ -102,7 +102,7 @@ class ResCollection {
 	/**
 	 * Gets a model from the collection by index position
 	 * @param {number} idx  Index of the model
-	 * @returns {*} Stored model. Undefined if the index is out of bounds.
+	 * @returns {module:modapp~Model} Stored model. Undefined if the index is out of bounds.
 	 */
 	atIndex(idx) {
 		return this._map[idx];

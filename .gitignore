@@ -5,4 +5,5 @@
 # Build files.
 # Put in root folder
 /class
+/def
 /*.js
