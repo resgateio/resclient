@@ -3,7 +3,7 @@
 # RES Client
 Javascript client implementing the RES-Client Protocol.
 
-The client is used to connect to a RES API. For more information about the RES protocol, visit the [resgate](https://github.com/jirenius/resgate).
+The client is used to connect to a RES API. For more information about the protocol, and some quick start examples, visit the [resgate](https://github.com/jirenius/resgate) project.
 
 ## Installation
 
@@ -17,12 +17,7 @@ With yarn:
 yarn add resclient
 ```
 
-## Usage
-
-Javascript client:
-```
-npm install resclient
-```
+## Example usage
 
 ```javascript
 import ResClient from 'resclient';
