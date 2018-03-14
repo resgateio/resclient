@@ -148,7 +148,6 @@ class ResClient {
 			};
 
 			var json = JSON.stringify(req);
-			console.log("srv <-- " + req.id + " - " + method + ":", req.params || "");
 			this.ws.send(json);
 		});
 	}
@@ -188,84 +187,62 @@ class ResClient {
 	}
 
 	_handleErrorResponse(req, data) {
-		console.group("srv --> " + data.id + " - Error");
-		console.log("Error:", data.error);
-
+		let err = new ResError(
+			data.error.code,
+			data.error.message,
+			data.error.data,
+			req.method,
+			req.params
+		);
 		try {
-			let err = new ResError(
-				data.error.code,
-				data.error.message,
-				data.error.data,
-				req.method,
-				req.params
-			);
-			try {
-				this._emit('error', err);
-			} catch (ex) {}
+			this._emit('error', err);
+		} catch (ex) {}
 
-			// Execute error callback bound to calling object
-			req.reject(err);
-
-		} finally {
-			console.groupEnd();
-		}
+		// Execute error callback bound to calling object
+		req.reject(err);
 	}
 
 	_handleSuccessResponse(req, data) {
-		console.group("srv --> " + data.id + " - Response");
-		console.log("Result: ", data.result);
-
-		try {
-			// Execute success callback bound to calling object
-			req.resolve(data.result);
-		} finally {
-			console.groupEnd();
-		}
+		// Execute success callback bound to calling object
+		req.resolve(data.result);
 	}
 
 	_handleEvent(data) {
-		console.group("srv --> " + data.event);
-		console.log("Data:", data.data);
+		// Event
+		let idx = data.event.lastIndexOf('.');
+		if (idx < 0 || idx === data.event.length - 1) {
+			throw new Error("Malformed event name: " + data.event);
+		}
 
-		try {
-			// Event
-			let idx = data.event.lastIndexOf('.');
-			if (idx < 0 || idx === data.event.length - 1) {
-				throw new Error("Malformed event name: " + data.event);
-			}
+		let rid = data.event.substr(0, idx);
 
-			let rid = data.event.substr(0, idx);
+		let cacheItem = this.cache[rid];
+		if (!cacheItem) {
+			throw new Error("Resource not found in cache");
+		}
 
-			let cacheItem = this.cache[rid];
-			if (!cacheItem) {
-				throw new Error("Resource not found in cache");
-			}
+		let event = data.event.substr(idx + 1);
 
-			let event = data.event.substr(idx + 1);
+		switch (event) {
+			case 'change':
+				this._handleChangeEvent(rid, cacheItem, event, data.data);
+				break;
 
-			switch (event) {
-				case 'change':
-					this._handleChangeEvent(rid, cacheItem, event, data.data);
-					break;
+			case 'add':
+				this._handleAddEvent(rid, cacheItem, event, data.data);
+				break;
 
-				case 'add':
-					this._handleAddEvent(rid, cacheItem, event, data.data);
-					break;
+			case 'remove':
+				this._handleRemoveEvent(rid, cacheItem, event, data.data);
+				break;
 
-				case 'remove':
-					this._handleRemoveEvent(rid, cacheItem, event, data.data);
-					break;
+			case 'unsubscribe':
+				this._handleUnsubscribeEvent(rid, cacheItem, event);
+				break;
 
-				case 'unsubscribe':
-					this._handleUnsubscribeEvent(rid, cacheItem, event);
-					break;
-
-				default:
-					this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + rid + '.' + event, data.data);
-					break;
-			}
-		} finally {
-			console.groupEnd();
+			default:
+				this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + rid + '.' + event, data.data);
+				break;
 		}
 	}
 
@@ -367,7 +344,7 @@ class ResClient {
 					let i = collection.length;
 					let a = new Array(i);
 					while (i--) {
-						a[i] = collection.atIndex(i).rid;
+						a[i] = collection.atIndex(i).getResourceId();
 					}
 
 					let b = response.map(m => m.rid);
@@ -502,13 +479,11 @@ class ResClient {
 
 		Promise.resolve(this.onConnect ? this.onConnect() : null)
 			.then(() => {
-				console.log("Connected");
 				this._subscribeToAllStale();
 				this._emit('connect', e);
 				this._connectResolve();
 			})
 			.catch(err => {
-				console.log("Error in onConnect callback: ", err);
 				if (this.ws) {
 					this.ws.close();
 				}
@@ -757,10 +732,10 @@ class ResClient {
 	_subscribeDirectCollectionModels(cacheItem, subscribed) {
 		let item = cacheItem.item, cacheModel;
 		for (let model of item) {
-			let modelId = model.rid;
+			let modelId = model.getResourceId();
 			cacheModel = this.cache[modelId];
 			if (!cacheModel) {
-				throw "Collection model not found in cache";
+				throw new Error("Collection model not found in cache");
 			}
 
 			// Are we missing an existing subscription to the model?
@@ -784,7 +759,7 @@ class ResClient {
 		let item = cacheItem.item, cacheModel;
 		if (cacheItem.isCollection) {
 			for (let model of item) {
-				let modelId = model.rid;
+				let modelId = model.getResourceId();
 				cacheModel = this.cache[modelId];
 				if (!cacheModel) {
 					throw "Collection model not found in cache";
