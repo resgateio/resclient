@@ -1,6 +1,7 @@
 /node_modules
 /coverage
 /package-lock.json
+/yarn.lock
 
 # Build files.
 # Put in root folder
