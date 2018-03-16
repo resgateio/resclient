@@ -8,3 +8,6 @@
 /class
 /def
 /*.js
+
+# Editor specifics
+.vscode/*
