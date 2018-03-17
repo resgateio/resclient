@@ -281,7 +281,7 @@ class ResClient {
 		}
 
 		let idx = cacheItem.item.__remove(modelId);
-		this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + rid + '.' + event, { item: cacheItem.item, idx });
+		this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + rid + '.' + event, { item: cacheModel.item, idx });
 
 		let indirect = cacheModel.removeIndirect();
 		// Don't we have a subscription to the model and no indirect references?
