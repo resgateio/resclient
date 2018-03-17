@@ -61,13 +61,12 @@ describe('ResClient', () => {
 	let port = 1000;
 	let server;
 	let client;
-	let model = {
+	const modelData = {
 		foo: "bar",
 		int: 42
 	};
 
 	function flushPromises(depth = 2) {
-		jest.runOnlyPendingTimers();
 		return new Promise(resolve => setImmediate(() => {
 			depth--;
 			if (depth) {
@@ -78,14 +77,30 @@ describe('ResClient', () => {
 		}));
 	}
 
-	function getModel(rid) {
+	function flushRequests(depth = 2, time = 10) {
+		jest.advanceTimersByTime(time);
+		return new Promise(resolve => setImmediate(() => {
+			depth--;
+			if (depth) {
+				flushRequests(depth).then(resolve);
+			} else {
+				resolve();
+			}
+		}));
+	}
+
+	function waitAWhile(time = 10000) {
+		jest.advanceTimersByTime(time);
+		return flushPromises();
+	}
+
+	function getResource(rid, data) {
 		let promise = client.getResource(rid);
 
-		return flushPromises().then(() => {
+		return flushRequests().then(() => {
 			let req = server.getNextRequest();
-			server.sendResponse(req, model);
-			jest.runOnlyPendingTimers();
-			return promise;
+			server.sendResponse(req, data);
+			return flushRequests().then(() => promise);
 		});
 	}
 
@@ -135,7 +150,8 @@ describe('ResClient', () => {
 				expect(model.foo).toBe("bar");
 			});
 
-			return flushPromises().then(() => {
+			return flushRequests().then(() => {
+				expect(server.error).toBe(null);
 				let req = server.getNextRequest();
 				expect(req).not.toBe(undefined);
 				expect(req.method).toBe('subscribe.service.model');
@@ -151,7 +167,7 @@ describe('ResClient', () => {
 		});
 
 		it('gets model resource from cache on second request', () => {
-			return getModel('service.model').then(model => {
+			return getResource('service.model', modelData).then(model => {
 				return client.getResource('service.model').then(modelSecond => {
 					expect(model).toBe(modelSecond);
 
@@ -161,28 +177,68 @@ describe('ResClient', () => {
 			});
 		});
 
-		it('unsubscribe model not listened too, removing it from cache', () => {
-			return getModel('service.model').then(model => {
+		it('unsubscribes model not listened too, removing it from cache', () => {
+			return getResource('service.model', modelData).then(model => {
 				// Cause unsubscribe by waiting
-				return flushPromises().then(() => {
+				return waitAWhile().then(flushRequests).then(() => {
+					expect(server.error).toBe(null);
 					let req = server.getNextRequest();
 					expect(req).not.toBe(undefined);
 					expect(req.method).toBe('unsubscribe.service.model');
 					server.sendResponse(req, null);
 
 					// Wait for the unsubscribe response
-					return flushPromises(3).then(() => {
-						let promise = client.getResource('service.model').then(modelSecond => {
+					return flushRequests().then(() => {
+						expect(server.error).toBe(null);
+
+						return getResource('service.model', modelData).then(modelSecond => {
 							expect(model).not.toBe(modelSecond);
 
 							let req = server.getNextRequest();
 							expect(req).toBe(undefined);
 						});
-
-						return flushPromises().then(promise);
 					});
 				});
 			});
 		});
 	});
+
+	describe('getResource collection', () => {
+		it('gets collection resource from server', () => {
+			let promise = client.getResource('service.collection').then(collection => {
+				expect(server.error).toBe(null);
+				expect(server.pendingRequests()).toBe(0);
+
+				expect(collection.length).toBe(3);
+				expect(collection.atIndex(0).name).toBe("Ten");
+				expect(collection.atIndex(1).name).toBe("Twenty");
+				expect(collection.atIndex(2).name).toBe("Thirty");
+			});
+
+			return flushRequests().then(() => {
+				let req = server.getNextRequest();
+				expect(req).not.toBe(undefined);
+				expect(req.method).toBe('subscribe.service.collection');
+				server.sendResponse(req, [
+					{ rid: 'service.item.10', data: { id: 10, name: "Ten" }},
+					{ rid: 'service.item.20', data: { id: 20, name: "Twenty" }},
+					{ rid: 'service.item.30', data: { id: 30, name: "Thirty" }}
+				]);
+
+				return flushRequests().then(() => promise);
+			});
+		});
+
+		it('gets collection resource from cache on second request', () => {});
+
+		it('unsubscribes collection and its models not listened too, removing it from cache', () => {});
+
+		it('subscribes to listened models before unsubscribing to the collection', () => {});
+
+		it('gets collection resource including a model already subscribed to', () => {});
+
+		it('unsubscribes to previously subscribed model while included in collection', () => {});
+	});
+
+
 });
