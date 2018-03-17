@@ -152,10 +152,6 @@ class ResClient {
 		});
 	}
 
-	_call(method, params) {
-		return this.send('instance.' + method, params);
-	}
-
 	/**
 	 * Recieves a incoming json encoded data string and executes the appropriate functions/callbacks.
 	 * @param {string} json Json encoded data

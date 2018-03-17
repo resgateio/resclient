@@ -28,6 +28,15 @@ class ResServer extends Server {
 		this.send(json);
 	}
 
+	sendError(req, code, message, data) {
+		let obj = { id: req.id, error: { code, message }};
+		if (data) {
+			obj.error.data = data;
+		}
+		let json = JSON.stringify(obj);
+		this.send(json);
+	}
+
 	sendEvent(rid, event, data) {
 		let json = JSON.stringify({ event: rid + '.' + event, data });
 		this.send(json);
@@ -224,6 +233,25 @@ describe("ResClient", () => {
 						});
 					});
 				});
+			});
+		});
+
+		it("rejects the promise on error", () => {
+			let promise = client.getResource('service.model').then(model => {
+				expect(model.foo).toBe("bar");
+			});
+
+			return flushRequests().then(() => {
+				let req = server.getNextRequest();
+				server.sendError(req, 'system.notFound', "Not found");
+				jest.runOnlyPendingTimers();
+				expect(server.error).toBe(null);
+				expect(server.pendingRequests()).toBe(0);
+
+				return expect(promise).rejects.toEqual(expect.objectContaining({
+					code: 'system.notFound',
+					message: "Not found"
+				}));
 			});
 		});
 	});
