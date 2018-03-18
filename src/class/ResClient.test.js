@@ -1,5 +1,7 @@
 import { Server } from 'mock-socket';
 import ResClient from './ResClient.js';
+import ResModel from './ResModel.js';
+import ResCollection from './ResCollection.js';
 
 class ResServer extends Server {
 	constructor(url) {
@@ -115,8 +117,8 @@ describe("ResClient", () => {
 		return flushPromises();
 	}
 
-	function getServerResource(rid, data) {
-		let promise = client.getResource(rid);
+	function getServerResource(rid, data, collectionFactory) {
+		let promise = client.getResource(rid, collectionFactory);
 
 		return flushRequests().then(() => {
 			expect(server.error).toBe(null);
@@ -237,9 +239,7 @@ describe("ResClient", () => {
 		});
 
 		it("rejects the promise on error", () => {
-			let promise = client.getResource('service.model').then(model => {
-				expect(model.foo).toBe("bar");
-			});
+			let promise = client.getResource('service.model');
 
 			return flushRequests().then(() => {
 				let req = server.getNextRequest();
@@ -593,6 +593,436 @@ describe("ResClient", () => {
 					let req = server.getNextRequest();
 					expect(req).toBe(undefined);
 				});
+			});
+		});
+
+		it("sets a listened model as stale when removed, subscribing to it after a while", () => {
+			return getServerResource('service.collection', collectionData).then(collection => {
+				let model = collection.atIndex(0);
+				collection.on('remove', cb);
+				model.on('change', cb2);
+				server.sendEvent('service.collection', 'remove', { rid: collectionData[0].rid, idx: 0 });
+
+				return flushRequests().then(() => {
+					expect(cb.mock.calls.length).toBe(1);
+					expect(collection.length).toBe(2);
+
+					expect(cb.mock.calls[0][0]).toEqual({ idx: 0, item: model });
+					expect(cb.mock.calls[0][1]).toBe(collection);
+
+					expect(server.pendingRequests()).toBe(0);
+
+					return waitAWhile().then(flushRequests).then(() => {
+						let req = server.getNextRequest();
+						expect(req).not.toBe(undefined);
+						expect(req.method).toBe('subscribe.' + collectionData[0].rid);
+						server.sendResponse(req, {
+							id: 10,
+							name: "X"
+						});
+
+						return flushRequests().then(() => {
+							expect(cb2.mock.calls.length).toBe(1);
+							expect(cb2.mock.calls[0][0]).toEqual({ name: "Ten" });
+							expect(cb2.mock.calls[0][1]).toBe(model);
+							expect(model.name).toBe("X");
+
+							expect(server.error).toBe(null);
+							expect(server.pendingRequests()).toBe(0);
+						});
+					});
+				});
+			});
+		});
+	});
+
+	describe("reconnect", () => {
+
+		it("reconnects after connection is lost", () => {
+			let promise = client.connect()
+				.then(() => {
+					let oldUrl = server.url;
+					expect(server.isConnected()).toBe(true);
+					server.close();
+					return flushPromises().then(() => {
+						server = new ResServer(oldUrl);
+						expect(server.isConnected()).toBe(false);
+
+						return waitAWhile().then(flushPromises).then(() => {
+							expect(server.isConnected()).toBe(true);
+						});
+					});
+				});
+			return flushRequests().then(() => promise);
+		});
+
+		it("resubscribes to a model after reconnect", () => {
+			return getServerResource('service.model', modelData).then(model => {
+				model.on('change', cb);
+				let oldUrl = server.url;
+				server.close();
+
+				return flushPromises().then(() => {
+					server = new ResServer(oldUrl);
+
+					return waitAWhile().then(flushRequests).then(() => {
+						expect(server.error).toBe(null);
+						let req = server.getNextRequest();
+						expect(req).not.toBe(undefined);
+						expect(req.method).toBe('subscribe.service.model');
+						server.sendResponse(req, modelData);
+
+						return flushRequests().then(() => {
+							expect(server.error).toBe(null);
+							expect(server.pendingRequests()).toBe(0);
+						});
+					});
+				});
+			});
+		});
+
+		it("emits a change event when resubscribed model differs from cached model", () => {
+			return getServerResource('service.model', modelData).then(model => {
+				model.on('change', cb);
+				let oldUrl = server.url;
+				server.close();
+
+				return flushPromises().then(() => {
+					server = new ResServer(oldUrl);
+
+					return waitAWhile().then(flushRequests).then(() => {
+						let req = server.getNextRequest();
+						server.sendResponse(req, {
+							foo: "baz",
+							int: 42
+						});
+
+						return flushRequests().then(() => {
+							expect(cb.mock.calls.length).toBe(1);
+							expect(cb.mock.calls[0][0]).toEqual({ foo: 'bar' });
+							expect(cb.mock.calls[0][1]).toBe(model);
+							expect(model.foo).toBe('baz');
+
+							expect(server.error).toBe(null);
+							expect(server.pendingRequests()).toBe(0);
+						});
+					});
+				});
+			});
+		});
+
+		it("emits remove and add events when collection differs from cached collection", () => {
+			return getServerResource('service.collection', collectionData).then(collection => {
+				let oldUrl = server.url;
+				collection.on('remove', cb);
+				collection.on('add', cb2);
+				server.close();
+
+				return flushPromises().then(() => {
+					server = new ResServer(oldUrl);
+
+					return waitAWhile().then(flushRequests).then(() => {
+						let req = server.getNextRequest();
+						server.sendResponse(req, [
+							collectionData[0],
+							{ rid: 'service.item.15', data: { id: 15, name: "Fifteen" }},
+							collectionData[2]
+						]);
+
+						return flushRequests().then(() => {
+							expect(collection.length).toBe(3);
+							expect(cb.mock.calls.length).toBe(1);
+							expect(cb.mock.calls[0][1]).toBe(collection);
+							expect(cb2.mock.calls.length).toBe(1);
+							expect(cb2.mock.calls[0][1]).toBe(collection);
+
+							expect(server.error).toBe(null);
+							expect(server.pendingRequests()).toBe(0);
+						});
+					});
+				});
+			});
+		});
+	});
+
+	describe("modelType", () => {
+
+		it("uses the registered model type when creating a model instance", () => {
+			client.registerModelType({
+				id: 'service.item',
+				modelFactory: (api, rid, data) => {
+					return new ResModel(api, rid, data, {
+						definition: {
+							id: { type: 'number' },
+							name: { type: 'string' },
+							flag: { type: 'boolean', default: true }
+						}
+					});
+				}
+			});
+
+			return getServerResource('service.collection', collectionData).then(collection => {
+				expect(collection.atIndex(0).flag).toBe(true);
+				expect(collection.atIndex(1).flag).toBe(true);
+				expect(collection.atIndex(1).flag).toBe(true);
+			});
+		});
+
+		it("does not use an unregistered model type when creating a model instance", () => {
+			client.registerModelType({
+				id: 'service.item',
+				modelFactory: (api, rid, data) => {
+					return new ResModel(api, rid, data, {
+						definition: {
+							id: { type: 'number' },
+							name: { type: 'string' },
+							flag: { type: 'boolean', default: true }
+						}
+					});
+				}
+			});
+
+			client.unregisterModelType('service.item');
+
+			return getServerResource('service.collection', collectionData).then(collection => {
+				expect(collection.atIndex(0).flag).toBe(undefined);
+				expect(collection.atIndex(1).flag).toBe(undefined);
+				expect(collection.atIndex(1).flag).toBe(undefined);
+			});
+		});
+
+		it("creates a collecting using collectionFactory callback function", () => {
+			let promise = client.getResource('service.collection', (api, rid, data) => {
+				let c = new ResCollection(api, rid, data);
+				c.flag = true;
+				return c;
+			}).then(collection => {
+				expect(collection.flag).toBe(true);
+			});
+
+			return flushRequests().then(() => {
+				let req = server.getNextRequest();
+				expect(req).not.toBe(undefined);
+				expect(req.method).toBe('subscribe.service.collection');
+				server.sendResponse(req, collectionData);
+
+				return flushRequests().then(() => promise);
+			});
+		});
+	});
+
+	describe("ResModel", () => {
+
+		it("calls remote method on call with parameters", () => {
+			return getServerResource('service.model', modelData).then(model => {
+				model.call('test', { zoo: "baz", value: 12 });
+
+				return flushRequests().then(() => {
+					expect(server.pendingRequests()).toBe(1);
+					expect(server.error).toBe(null);
+					let req = server.getNextRequest();
+					expect(req.method).toBe('call.service.model.test');
+					expect(req.params).toEqual({ zoo: "baz", value: 12 });
+				});
+			});
+		});
+
+		it("calls remote method on call without parameters", () => {
+			return getServerResource('service.model', modelData).then(model => {
+				model.call('test');
+				return flushRequests().then(() => {
+					let req = server.getNextRequest();
+					expect([ null, undefined ]).toContain(req.params);
+				});
+			});
+		});
+
+		it("calls set method on set", () => {
+			return getServerResource('service.model', modelData).then(model => {
+				model.set({ foo: "baz" });
+				return flushRequests().then(() => {
+					let req = server.getNextRequest();
+					expect(req.method).toBe('call.service.model.set');
+					expect(req.params).toEqual({ foo: "baz" });
+				});
+			});
+		});
+
+		it("resolves call promise on success", () => {
+			return getServerResource('service.model', modelData).then(model => {
+				let promise = model.call('test');
+
+				return flushRequests().then(() => {
+					let req = server.getNextRequest();
+					server.sendResponse(req, { responseValue: true });
+
+					return flushRequests().then(() => {
+						return expect(promise).resolves.toEqual({ responseValue: true });
+					});
+				});
+			});
+		});
+
+		it("rejects call promise on error", () => {
+			return getServerResource('service.model', modelData).then(model => {
+				let promise = model.call('test');
+
+				return flushRequests().then(() => {
+					let req = server.getNextRequest();
+					expect(req).not.toBe(undefined);
+					server.sendError(req, 'service.testError', "Test error");
+
+					return expect(promise).rejects.toEqual(expect.objectContaining({
+						code: 'service.testError',
+						message: "Test error"
+					}));
+				});
+			});
+		});
+
+		it("creates anonymous object on toJSON", () => {
+			return getServerResource('service.model', { foo: "bar", value: 10 }).then(model => {
+				expect(model.toJSON()).toEqual({ foo: "bar", value: 10 });
+			});
+		});
+
+		it("creates anonymous object on toJSON using definition", () => {
+			client.registerModelType({
+				id: 'service.model',
+				modelFactory: (api, rid, data) => {
+					return new ResModel(api, rid, data, {
+						definition: {
+							foo: { type: 'string' },
+							value: { type: 'number', default: 10 },
+							notProvided: { type: 'string', default: "Not provided" }
+						}
+					});
+				}
+			});
+
+			return getServerResource('service.model', {
+				foo: "bar",
+				value: 12,
+				notDefined: "Not defined"
+			}).then(model => {
+				expect(model.toJSON()).toEqual({
+					foo: "bar",
+					value: 12,
+					notProvided: "Not provided"
+				});
+			});
+		});
+	});
+
+	describe("ResCollection", () => {
+
+		it("calls new method on create", () => {
+			return getServerResource('service.collection', collectionData).then(collection => {
+				collection.create({ foo: "baz" });
+				return flushRequests().then(() => {
+					let req = server.getNextRequest();
+					expect(req.method).toBe('call.service.collection.new');
+					expect(req.params).toEqual({ foo: "baz" });
+				});
+			});
+		});
+
+		it("calls remove method on remove", () => {
+			return getServerResource('service.collection', collectionData).then(collection => {
+				collection.remove('service.item.10');
+				return flushRequests().then(() => {
+					let req = server.getNextRequest();
+					expect(req.method).toBe('call.service.collection.remove');
+					expect(req.params).toEqual({ rid: 'service.item.10' });
+				});
+			});
+		});
+
+		it("getResourceId returns the collection resource ID", () => {
+			return getServerResource('service.collection', collectionData).then(collection => {
+				expect(collection.getResourceId()).toBe('service.collection');
+			});
+		});
+
+		it("getResourceId returns the collection resource ID", () => {
+			return getServerResource('service.collection', collectionData).then(collection => {
+				expect(collection.getResourceId()).toBe('service.collection');
+			});
+		});
+
+		it("length gets the collection length", () => {
+			return getServerResource('service.collection', collectionData).then(collection => {
+				expect(collection.length).toBe(3);
+			});
+		});
+
+		it("get returns the model using resource ID without idAttribute set", () => {
+			return getServerResource('service.collection', collectionData).then(collection => {
+				expect(collection.get('service.item.10').toJSON()).toEqual({ id: 10, name: "Ten" });
+				expect(collection.get('service.item.20').toJSON()).toEqual({ id: 20, name: "Twenty" });
+				expect(collection.get('service.item.30').toJSON()).toEqual({ id: 30, name: "Thirty" });
+			});
+		});
+
+		it("get returns the model using ID with idAttribute set", () => {
+			return getServerResource('service.collection', collectionData, (api, rid, data) => {
+				return new ResCollection(api, rid, data, {
+					idAttribute: m => m.id
+				});
+			}).then(collection => {
+				expect(collection.get(10).toJSON()).toEqual({ id: 10, name: "Ten" });
+				expect(collection.get(20).toJSON()).toEqual({ id: 20, name: "Twenty" });
+				expect(collection.get(30).toJSON()).toEqual({ id: 30, name: "Thirty" });
+			});
+		});
+
+		it("indexOf gets the index of a model using resource ID without idAttribute set", () => {
+			return getServerResource('service.collection', collectionData).then(collection => {
+				expect(collection.indexOf('service.item.10')).toBe(0);
+				expect(collection.indexOf('service.item.20')).toBe(1);
+				expect(collection.indexOf('service.item.30')).toBe(2);
+			});
+		});
+
+		it("indexOf gets the index of a model using ID with idAttribute set", () => {
+			return getServerResource('service.collection', collectionData, (api, rid, data) => {
+				return new ResCollection(api, rid, data, {
+					idAttribute: m => m.id
+				});
+			}).then(collection => {
+				expect(collection.indexOf(10)).toBe(0);
+				expect(collection.indexOf(20)).toBe(1);
+				expect(collection.indexOf(30)).toBe(2);
+			});
+		});
+
+		it("indexOf gets the index of a model", () => {
+			return getServerResource('service.collection', collectionData).then(collection => {
+				let model10 = collection.atIndex(0);
+				let model20 = collection.atIndex(1);
+				let model30 = collection.atIndex(2);
+				expect(collection.indexOf(model10)).toBe(0);
+				expect(collection.indexOf(model20)).toBe(1);
+				expect(collection.indexOf(model30)).toBe(2);
+			});
+		});
+
+		it("atIndex returns model at given index", () => {
+			return getServerResource('service.collection', collectionData).then(collection => {
+				expect(collection.atIndex(0).toJSON()).toEqual({ id: 10, name: "Ten" });
+				expect(collection.atIndex(1).toJSON()).toEqual({ id: 20, name: "Twenty" });
+				expect(collection.atIndex(2).toJSON()).toEqual({ id: 30, name: "Thirty" });
+			});
+		});
+
+		it("implements iterable", () => {
+			return getServerResource('service.collection', collectionData).then(collection => {
+				let i = 0;
+				for (let model of collection) {
+					expect(model.id).toBe(collectionData[i].data.id);
+					expect(model.name).toBe(collectionData[i].data.name);
+					i++;
+				}
 			});
 		});
 	});

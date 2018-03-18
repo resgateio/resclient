@@ -662,7 +662,7 @@ class ResClient {
 	 * @returns {Promise.<Model>} Promise of the created model
 	 */
 	createModel(collectionId, props) {
-		return this._send('new.' + collectionId, props).then(response => {
+		return this._send('call.' + collectionId + '.new', props).then(response => {
 			let cacheModel = this._getCachedModel(response.rid, response.data);
 			cacheModel.setSubscribed(true);
 			return cacheModel.item;
@@ -670,7 +670,7 @@ class ResClient {
 	}
 
 	removeModel(collectionId, rid) {
-		return this._send('delete.' + collectionId, { rid });
+		return this._send('call.' + collectionId + '.remove', { rid });
 	}
 
 	setModel(modelId, props) {

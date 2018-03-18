@@ -8,11 +8,3 @@ export class ResError {
 		this.params = params;
 	}
 }
-
-let error = {
-	unknownSession: () => new ResError('resclient.unknownSession', `Unknown session`),
-	unknownChannel: () => new ResError('resclient.unknownChannel', `Unknown channel`),
-	invalidResponse: () => new ResError('resclient.invalidResponse', `Invalid response`)
-};
-
-export default error;

@@ -34,7 +34,7 @@ class ResCollection {
 			for (let cont of data) {
 				this._map.add(cont.rid, cont.model);
 				if (this._idAttribute) {
-					this._modelResources[this._idAttribute(cont.model)] = rid;
+					this._modelResources[this._idAttribute(cont.model)] = cont.rid;
 				}
 			}
 		}
@@ -90,13 +90,16 @@ class ResCollection {
 	}
 
 	/**
-	 * Retrieves the order index of an model.
-	 * @param {string} id Id of the model
+	 * Retrieves the order index of a model.
+	 * @param {string|Model} id Id of the model or the model object
 	 * @returns {number} Order index of the model. -1 if the model id doesn't exist.
 	 */
-	indexOfId(id) {
-		let modelId = this._idAttribute ? this._modelResources[id] : id;
-		return this._map.indexOf(modelId);
+	indexOf(id) {
+		if (id && typeof id !== 'object') {
+			let rid = this._idAttribute ? this._modelResources[id] : id;
+			id = rid ? this._map.get(rid) : null;
+		}
+		return id ? this._map.indexOf(id) : -1;
 	}
 
 	/**
