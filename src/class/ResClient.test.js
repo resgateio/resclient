@@ -745,6 +745,44 @@ describe("ResClient", () => {
 		});
 	});
 
+	describe("setOnConnect", () => {
+
+		it("calls the setOnConnect callback after connect", () => {
+			client.setOnConnect(cb);
+			client.connect();
+			jest.runAllTimers();
+			expect(cb.mock.calls.length).toBe(1);
+		});
+
+		it("postpones any request until setOnConnect callback resolves", () => {
+			let onConnect = jest.fn(() => client.callModel('service.model', 'test'));
+			client.setOnConnect(onConnect);
+
+			let promise = client.getResource('service.model');
+
+			return flushRequests().then(() => {
+				expect(server.pendingRequests()).toBe(1);
+				expect(server.error).toBe(null);
+				let req = server.getNextRequest();
+				expect(req.method).toBe('call.service.model.test');
+				server.sendResponse(req, null);
+
+				return flushRequests().then(() => {
+
+					expect(server.error).toBe(null);
+					let req = server.getNextRequest();
+					expect(req).not.toBe(undefined);
+					expect(req.method).toBe('subscribe.service.model');
+					server.sendResponse(req, modelData);
+					jest.runOnlyPendingTimers();
+					expect(server.error).toBe(null);
+					expect(server.pendingRequests()).toBe(0);
+					return promise;
+				});
+			});
+		});
+	});
+
 	describe("modelType", () => {
 
 		it("uses the registered model type when creating a model instance", () => {
