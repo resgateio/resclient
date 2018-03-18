@@ -1025,5 +1025,15 @@ describe("ResClient", () => {
 				}
 			});
 		});
+
+		it("creates anonymous array on toJSON", () => {
+			return getServerResource('service.collection', collectionData).then(collection => {
+				expect(collection.toJSON()).toEqual([
+					{ id: 10, name: "Ten" },
+					{ id: 20, name: "Twenty" },
+					{ id: 30, name: "Thirty" }
+				]);
+			});
+		});
 	});
 });

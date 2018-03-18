@@ -171,6 +171,18 @@ class ResCollection {
 		return idx;
 	}
 
+	toJSON() {
+		let m;
+		let len = this._map.length;
+		let arr = new Array(len);
+		for (let i = 0; i < len; i++) {
+			m = this._map[i];
+			arr[i] = m.toJSON ? m.toJSON() : m;
+		}
+
+		return arr;
+	}
+
 	[Symbol.iterator]() {
 		let i = 0,
 			a = this._map,
