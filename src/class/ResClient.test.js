@@ -376,8 +376,7 @@ describe("ResClient", () => {
 					model.off('change', cb);
 
 					return waitAWhile().then(flushRequests).then(() => {
-						let req = server.getNextRequest();
-						expect(req).toBe(undefined);
+						expect(server.pendingRequests()).toBe(0);
 						model.off('change', cb2);
 
 						return waitAWhile().then(flushRequests).then(() => {
@@ -393,11 +392,27 @@ describe("ResClient", () => {
 
 								return getServerResource('service.model', modelData).then(modelSecond => {
 									expect(model).not.toBe(modelSecond);
-
-									let req = server.getNextRequest();
-									expect(req).toBe(undefined);
+									expect(server.pendingRequests()).toBe(0);
 								});
 							});
+						});
+					});
+				});
+			});
+		});
+
+		it("does not unsubscribe to model re-listened to before unsubscribe delay", () => {
+			return getServerResource('service.model', modelData).then(model => {
+				model.on('change', cb);
+
+				return waitAWhile().then(flushRequests).then(() => {
+					model.off('change', cb);
+
+					return waitAWhile(1000).then(flushRequests).then(() => {
+						model.on('change', cb2);
+
+						return waitAWhile().then(flushRequests).then(() => {
+							expect(server.pendingRequests()).toBe(0);
 						});
 					});
 				});
@@ -436,6 +451,67 @@ describe("ResClient", () => {
 					expect(req).toBe(undefined);
 				});
 			});
+		});
+
+		it("emits an event received before unsubscribe response", () => {
+			return getServerResource('service.model', modelData).then(model => {
+				// Cause unsubscribe by waiting
+				return waitAWhile().then(flushRequests).then(() => {
+					let req = server.getNextRequest();
+					server.sendEvent('service.model', 'custom', { foo: 'baz' });
+					server.sendResponse(req, null);
+
+					// Wait for the unsubscribe response
+					return flushRequests().then(() => {
+						expect(server.error).toBe(null);
+
+						return getServerResource('service.model', modelData).then(modelSecond => {
+							expect(model).not.toBe(modelSecond);
+
+							let req = server.getNextRequest();
+							expect(req).toBe(undefined);
+						});
+					});
+				});
+			});
+		});
+
+		it("tries to resubscribes a while after unsubscribe event", () => {
+			return getServerResource('service.model', modelData).then(model => {
+				model.on('unsubscribe', cb);
+
+				server.sendEvent('service.model', 'unsubscribe');
+				return flushRequests().then(() => {
+					expect(server.pendingRequests()).toBe(0);
+					expect(cb.mock.calls.length).toBe(1);
+
+					return waitAWhile().then(flushRequests()).then(() => {
+						expect(server.error).toBe(null);
+						expect(server.pendingRequests()).toBe(1);
+						let req = server.getNextRequest();
+						expect(req.method).toBe('subscribe.service.model');
+					});
+				});
+			});
+		});
+
+		it("instantly removes stale item from cache when no longer listened to", () => {
+			return getServerResource('service.model', modelData).then(model => {
+				model.on('custom', cb);
+
+				server.sendEvent('service.model', 'unsubscribe');
+				return flushRequests().then(() => {
+					model.off('custom', cb);
+
+					return getServerResource('service.model', modelData).then(modelSecond => {
+						expect(model).not.toBe(modelSecond);
+					});
+				});
+			});
+		});
+
+		it("instantly resubscribes to a model when listening between an unsubscribe request and its response", () => {
+			// TODO
 		});
 	});
 
