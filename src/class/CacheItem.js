@@ -5,11 +5,11 @@ class CacheItem {
 	/**
 	 * Creates a CacheItem instance
 	 * @param {string} rid Resource ID
-	 * @param {function} unsubCallback Unsubscribe callback
+	 * @param {function} unsubcribeCallback Unsubscribe callback
 	 */
-	constructor(rid, unsubCallback) {
+	constructor(rid, unsubcribeCallback) {
 		this.rid = rid;
-		this._unsubCallback = unsubCallback;
+		this._unsubscribe = unsubcribeCallback;
 
 		this.item = null;
 		this.direct = 0;
@@ -29,23 +29,22 @@ class CacheItem {
 	}
 
 	setPromise(promise) {
-		this.promise = promise;
+		if (!this.item) {
+			this.promise = promise;
+		}
 		return this;
 	}
 
-	setItem(item) {
+	setItem(item, isCollection) {
 		this.item = item;
+		this.isCollection = isCollection;
+		this.promise = null;
 		this._checkUnsubscribe();
 		return this;
 	}
 
 	setType(modelType) {
 		this.type = modelType;
-		return this;
-	}
-
-	setIsCollection() {
-		this.isCollection = true;
 		return this;
 	}
 
@@ -63,20 +62,19 @@ class CacheItem {
 			throw "Direct count reached below 0";
 		}
 		this._checkUnsubscribe();
-		return this.direct;
 	}
 
 	_checkUnsubscribe() {
-		if (this.unsubTimeout || this.direct || this.indirect) {
+		if (this.direct || this.indirect || this.unsubTimeout) {
 			return;
 		}
 
 		// Check if we are subscribed, we delay unsubscribing.
 		// If not, the data is anyway stale and may be removed directly
 		if (this.subscribed) {
-			this.unsubTimeout = setTimeout(() => this._unsubCallback(this), unsubscribeDelay);
+			this.unsubTimeout = setTimeout(() => this._unsubscribe(this), unsubscribeDelay);
 		} else {
-			this._unsubCallback(this);
+			this._unsubscribe(this);
 		}
 	}
 
@@ -89,7 +87,18 @@ class CacheItem {
 		if (this.indirect < 0) {
 			throw "Indirect count reached below 0";
 		}
-		return this.indirect;
+		this._checkUnsubscribe();
+	}
+
+	// Checks if the cachedItem can be deleted.
+	// It returns true if there are no direct listeners, no indirect references, and it is not subscribed
+	// If it returns true, unsubTimeout is cleared
+	canDelete() {
+		if (this.direct || this.indirect || this.subscribed) {
+			return false;
+		}
+		clearTimeout(this.unsubTimeout);
+		return true;
 	}
 }
 

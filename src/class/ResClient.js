@@ -123,6 +123,133 @@ class ResClient {
 	}
 
 	/**
+	 * Model factory callback for the Model Type
+	 * @callback module/Api~modelFactoryCallback
+	 * @param {module/Api} api Api module
+	 * @param {string} rid Resource id of model
+	 * @param {object} data Model data
+	 */
+
+	/**
+	 * Model type definition object
+	 * @typedef {object} module/Api~ModelType
+	 * @property {string} id Id of model type. Should be service name and type name. Eg. 'userService.user'
+	 * @property {module/Api~modelFactoryCallback} modelFactory Model factory callback
+	 */
+
+	/**
+	 * Register a model type
+	 * @param {module/Api~ModelType} modelType Model type definition object
+	 */
+	registerModelType(modelType) {
+		if (this.modelTypes[modelType.id]) {
+			throw new Error(`Model type ${modeType.id} already registered`);
+		}
+
+		if (!modelType.id || !modelType.id.match(/^[^.]+\.[^.]+$/)) {
+			throw new Error(`Invalid model type id: ${modelType.id}`);
+		}
+
+		this.modelTypes[modelType.id] = modelType;
+	}
+
+	/**
+	 * Unregister a model type
+	 * @param {string} modelTypeId Id of model type
+	 * @returns {?object} Model type definition object, or null if it wasn't registered
+	 */
+	unregisterModelType(modelTypeId) {
+		let modelType = this.modelTypes[modelTypeId];
+
+		if (!modelType) {
+			return null;
+		}
+
+		delete this.modelTypes[modelTypeId];
+		return modelType;
+	}
+
+	/**
+	 * Get a resource from the backend
+	 * @param {string} rid Resource ID
+	 * @param {function} [collectionFactory] Collection factory function.
+	 * @return {Promise.<Model|Collection>} Promise of the resourcce
+	 */
+	getResource(rid, collectionFactory = defaultCollectionFactory) {
+		// Check for resource in cache
+		let cacheItem = this.cache[rid];
+		if (cacheItem) {
+			return cacheItem.promise ? cacheItem.promise : Promise.resolve(cacheItem.item);
+		}
+
+		cacheItem = new CacheItem(rid, this._unsubscribeCacheItem).setSubscribed(true);
+		this.cache[rid] = cacheItem;
+
+		cacheItem.setPromise(this._send('subscribe.' + rid)
+			.then(response => {
+				return this._getCachedResource(rid, response, false, collectionFactory).item;
+			})
+			.catch(err => {
+				cacheItem.setSubscribed(false);
+				this._tryDelete(cacheItem);
+				throw err;
+			})
+		);
+
+		return cacheItem.promise;
+	}
+
+	/**
+	 * Create a new model resource
+	 * @param {string} collectionId Existing collection in which the resource is to be created
+	 * @param {?object} props Model properties
+	 * @returns {Promise.<Model>} Promise of the created model
+	 */
+	createModel(collectionId, props) {
+		return this._send('call.' + collectionId + '.new', props).then(response => {
+			let cacheModel = this._getCachedModel(response.rid, response.data);
+			cacheModel.setSubscribed(true);
+			return cacheModel.item;
+		});
+	}
+
+	removeModel(collectionId, rid) {
+		return this._send('call.' + collectionId + '.remove', { rid });
+	}
+
+	setModel(modelId, props) {
+		return this._send('call.' + modelId + '.set', props);
+	}
+
+	callModel(modelId, method, params) {
+		return this._send('call.' + modelId + '.' + method, params);
+	}
+
+	authenticate(rid, method, params) {
+		return this._send('auth.' + rid + '.' + method, params);
+	}
+
+	resourceOn(rid, events, handler) {
+		let cacheItem = this.cache[rid];
+		if (!cacheItem) {
+			throw new Error("Resource not found in cache: " + rid);
+		}
+
+		cacheItem.addDirect();
+		this.eventBus.on(cacheItem.item, events, handler, this.namespace + '.resource.' + rid);
+	}
+
+	resourceOff(rid, events, handler) {
+		let cacheItem = this.cache[rid];
+		if (!cacheItem) {
+			throw new Error("Resource not found in cache");
+		}
+
+		cacheItem.removeDirect();
+		this.eventBus.off(cacheItem.item, events, handler, this.namespace + '.resource.' + rid);
+	}
+
+	/**
 	 * Sends a JsonRpc call to the server
 	 * @param {object} method Method name
 	 * @param {object} params Method parameters
@@ -221,19 +348,19 @@ class ResClient {
 
 		switch (event) {
 			case 'change':
-				this._handleChangeEvent(rid, cacheItem, event, data.data);
+				this._handleChangeEvent(cacheItem, event, data.data);
 				break;
 
 			case 'add':
-				this._handleAddEvent(rid, cacheItem, event, data.data);
+				this._handleAddEvent(cacheItem, event, data.data);
 				break;
 
 			case 'remove':
-				this._handleRemoveEvent(rid, cacheItem, event, data.data);
+				this._handleRemoveEvent(cacheItem, event, data.data);
 				break;
 
 			case 'unsubscribe':
-				this._handleUnsubscribeEvent(rid, cacheItem, event);
+				this._handleUnsubscribeEvent(cacheItem, event);
 				break;
 
 			default:
@@ -242,66 +369,51 @@ class ResClient {
 		}
 	}
 
-	_handleChangeEvent(rid, cacheItem, event, data) {
+	_handleChangeEvent(cacheItem, event, data) {
 		if (cacheItem.type.change) {
 			cacheItem.type.change(cacheItem.item, data);
 		} else {
 			// Default behaviour
 			let changed = cacheItem.item.__update(data);
 			if (changed) {
-				this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + rid + '.' + event, changed);
+				this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + cacheItem.rid + '.' + event, changed);
 			}
 		}
 	}
 
-	_handleAddEvent(rid, cacheItem, event, data) {
+	_handleAddEvent(cacheItem, event, data) {
 		if (!cacheItem.isCollection) {
 			throw new Error("Add event on model");
 		}
 
-		let modelId = data.rid;
-		let cacheModel = this._getCachedModel(modelId, data.data, true);
-		let idx = cacheItem.item.__add(modelId, cacheModel.item, data.idx);
-		this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + rid + '.' + event, { item: cacheModel.item, idx });
+		let rid = data.rid;
+		let cacheModel = this._getCachedResource(rid, data.data, true);
+		let idx = cacheItem.item.__add(rid, cacheModel.item, data.idx);
+		this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + cacheItem.rid + '.' + event, { item: cacheModel.item, idx });
 	}
 
-	_handleRemoveEvent(rid, cacheItem, event, data) {
+	_handleRemoveEvent(cacheItem, event, data) {
 		if (!cacheItem.isCollection) {
 			throw new Error("Remove event on model");
 		}
 
-		let modelId = data.rid;
-		let cacheModel = this.cache[modelId];
+		let rid = data.rid;
+		let cacheModel = this.cache[rid];
 		if (!cacheModel) {
 			throw new Error("Removed model is not in cache");
 		}
 
-		let idx = cacheItem.item.__remove(modelId);
-		this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + rid + '.' + event, { item: cacheModel.item, idx });
+		let idx = cacheItem.item.__remove(rid);
+		this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + cacheItem.rid + '.' + event, { item: cacheModel.item, idx });
 
-		let indirect = cacheModel.removeIndirect();
-		// Don't we have a subscription to the model and no indirect references?
-		if (!cacheModel.subscribed && !indirect) {
-			if (cacheModel.direct) {
-				// If there are direct references to the model, the data
-				// should now be considered stale. A new subscription
-				// is triggered.
-				this._setStale(modelId);
-			} else {
-				// If there are no references, just delete it from the cache
-				delete this.cache[modelId];
-			}
-		}
+		cacheModel.removeIndirect();
+		this._tryDelete(cacheModel);
 	}
 
-	_handleUnsubscribeEvent(rid, cacheItem, event) {
+	_handleUnsubscribeEvent(cacheItem, event) {
 		cacheItem.setSubscribed(false);
-		if (cacheItem.direct || cacheItem.indirect) {
-			this._setStale(rid);
-		} else {
-			this._removeCacheItem(cacheItem);
-		}
-		this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + rid + '.' + event, { item: cacheItem.item });
+		this._tryDelete(cacheItem);
+		this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + cacheItem.rid + '.' + event, { item: cacheItem.item });
 	}
 
 	_setStale(rid) {
@@ -331,48 +443,9 @@ class ResClient {
 					return;
 				}
 
-				if (cacheItem.isCollection !== Array.isArray(response)) {
-					throw new Error("Resource type inconsistency");
-				}
-
-				if (cacheItem.isCollection) {
-					let collection = cacheItem.item;
-					let i = collection.length;
-					let a = new Array(i);
-					while (i--) {
-						a[i] = collection.atIndex(i).getResourceId();
-					}
-
-					let b = response.map(m => m.rid);
-					this._patchDiff(a, b,
-						(id, m, n, idx) => {
-							if (response[n].data) {
-								this._getCachedModel(id, response[n].data);
-							}
-						},
-						(id, n, idx) => this._handleAddEvent(rid, cacheItem, 'add', {
-							rid: id,
-							data: response[n].data,
-							idx: idx
-						}),
-						(id, m, idx) => this._handleRemoveEvent(rid, cacheItem, 'remove', {
-							rid: id
-						})
-					);
-				} else {
-					this._handleChangeEvent(rid, cacheItem, 'change', response);
-				}
-
-				cacheItem.promise = null;
-				return cacheItem.item;
+				this._syncResource(cacheItem, response);
 			})
-			.catch(err => {
-				cacheItem.setSubscribed(false);
-
-				if (!cacheItem.subscribed && !cacheItem.indirect && cacheItem.direct) {
-					this._setStale(rid);
-				}
-			});
+			.catch(this._handleFailedSubscribe.bind(this, cacheItem));
 	}
 
 	_patchDiff(a, b, onKeep, onAdd, onRemove) {
@@ -514,12 +587,15 @@ class ResClient {
 		this.ws = null;
 		if (this.connected) {
 			this.connected = false;
-			this._emit('close', e);
-		}
 
-		// Set any item in cache to stale
-		for (let id in this.cache) {
-			this.cache[id].setSubscribed(false);
+			// Set any item in cache to stale
+			for (let id in this.cache) {
+				let cacheItem = this.cache[id];
+				this.cache[id].setSubscribed(false);
+				this._tryDelete(cacheItem);
+			}
+
+			this._emit('close', e);
 		}
 
 		if (this.tryConnect) {
@@ -558,250 +634,174 @@ class ResClient {
 	}
 
 	/**
-	 * Model factory callback for the Model Type
-	 * @callback module/Api~modelFactoryCallback
-	 * @param {module/Api} api Api module
-	 * @param {string} rid Resource id of model
-	 * @param {object} data Model data
+	 * Tries to delete the cached item.
+	 * It will delete if there are no direct listeners, indirect references, or any subscription.
+	 * @param {object} cacheItem Cache item to delete
+	 * @returns {boolean} True if the item was deleted from cache, otherwise false
 	 */
-
-	/**
-	 * Model type definition object
-	 * @typedef {object} module/Api~ModelType
-	 * @property {string} id Id of model type. Should be service name and type name. Eg. 'userService.user'
-	 * @property {module/Api~modelFactoryCallback} modelFactory Model factory callback
-	 */
-
-	/**
-	 * Register a model type
-	 * @param {module/Api~ModelType} modelType Model type definition object
-	 */
-	registerModelType(modelType) {
-		if (this.modelTypes[modelType.id]) {
-			throw new Error(`Model type ${modeType.id} already registered`);
+	_tryDelete(cacheItem) {
+		if (cacheItem.indirect) {
+			return false;
 		}
 
-		if (!modelType.id || !modelType.id.match(/^[^.]+\.[^.]+$/)) {
-			throw new Error(`Invalid model type id: ${modelType.id}`);
-		}
-
-		this.modelTypes[modelType.id] = modelType;
-	}
-
-	/**
-	 * Unregister a model type
-	 * @param {string} modelTypeId Id of model type
-	 * @returns {?object} Model type definition object, or null if it wasn't registered
-	 */
-	unregisterModelType(modelTypeId) {
-		let modelType = this.modelTypes[modelTypeId];
-
-		if (!modelType) {
-			return null;
-		}
-
-		delete this.modelTypes[modelTypeId];
-		return modelType;
-	}
-
-	/**
-	 * Get a resource from the backend
-	 * @param {string} rid Resource ID
-	 * @param {function} [collectionFactory] Collection factory function.
-	 * @return {Promise.<Model|Collection>} Promise of the resourcce
-	 */
-	getResource(rid, collectionFactory = defaultCollectionFactory) {
-		// Check for resource in cache
-		let cacheItem = this.cache[rid];
-		if (cacheItem) {
-			return cacheItem.promise ? cacheItem.promise : Promise.resolve(cacheItem.item);
-		}
-
-		cacheItem = new CacheItem(rid, this._unsubscribeCacheItem).setSubscribed(true);
-		cacheItem.setPromise(this._send('subscribe.' + rid)
-			.then(response => {
-				if (Array.isArray(response)) {
-					let modelConts = response.map(m => {
-						let cacheModel = this._getCachedModel(m.rid, m.data, true);
-						return {
-							rid: m.rid,
-							model: cacheModel.item
-						};
-					});
-
-					cacheItem.setItem(collectionFactory(this, rid, modelConts));
-					cacheItem.setIsCollection();
-				} else {
-					let modelType = this._getModelType(rid);
-					cacheItem.setItem(modelType.modelFactory(
-						this,
-						rid,
-						response
-					)).setType(modelType);
-				}
-
-				cacheItem.promise = null;
-				return cacheItem.item;
-			})
-			.catch(err => {
-				// Do not cache an error
-				cacheItem.setSubscribed(false);
-				delete this.cache[rid];
-				throw err;
-			})
-		);
-
-		this.cache[rid] = cacheItem;
-		return cacheItem.promise;
-	}
-
-	/**
-	 * Create a new model resource
-	 * @param {string} collectionId Existing collection in which the resource is to be created
-	 * @param {?object} props Model properties
-	 * @returns {Promise.<Model>} Promise of the created model
-	 */
-	createModel(collectionId, props) {
-		return this._send('call.' + collectionId + '.new', props).then(response => {
-			let cacheModel = this._getCachedModel(response.rid, response.data);
-			cacheModel.setSubscribed(true);
-			return cacheModel.item;
-		});
-	}
-
-	removeModel(collectionId, rid) {
-		return this._send('call.' + collectionId + '.remove', { rid });
-	}
-
-	setModel(modelId, props) {
-		return this._send('call.' + modelId + '.set', props);
-	}
-
-	callModel(modelId, method, params) {
-		return this._send('call.' + modelId + '.' + method, params);
-	}
-
-	authenticate(rid, method, params) {
-		return this._send('auth.' + rid + '.' + method, params);
-	}
-
-	resourceOn(rid, events, handler) {
-		let cacheItem = this.cache[rid];
-		if (!cacheItem) {
-			throw new Error("Resource not found in cache: " + rid);
-		}
-
-		cacheItem.addDirect();
-		this.eventBus.on(cacheItem.item, events, handler, this.namespace + '.resource.' + rid);
-	}
-
-	resourceOff(rid, events, handler) {
-		let cacheItem = this.cache[rid];
-		if (!cacheItem) {
-			throw new Error("Resource not found in cache");
-		}
-
-		cacheItem.removeDirect();
-		this.eventBus.off(cacheItem.item, events, handler, this.namespace + '.resource.' + rid);
-	}
-
-	_unsubscribeCacheItem(cacheItem) {
-		let subscribed = cacheItem.subscribed;
-
-		if (cacheItem.isCollection && this.connected) {
-			this._subscribeDirectCollectionModels(cacheItem, subscribed);
-		}
-
-		if (subscribed) {
-			cacheItem.setSubscribed(false);
-		}
-
-		if (this.connected && subscribed) {
-			this._send('unsubscribe.' + cacheItem.rid).then(() => {
-				this._removeCacheItem(cacheItem);
-			});
-		} else {
-			this._removeCacheItem(cacheItem);
-		}
-	}
-
-	_subscribeDirectCollectionModels(cacheItem, subscribed) {
-		let item = cacheItem.item, cacheModel;
-		for (let model of item) {
-			let modelId = model.getResourceId();
-			cacheModel = this.cache[modelId];
-			if (!cacheModel) {
-				throw new Error("Collection model not found in cache");
+		if (cacheItem.direct) {
+			if (!cacheItem.subscribed) {
+				this._setStale(cacheItem.rid);
 			}
-
-			// Are we missing an existing subscription to the model?
-			if (!cacheModel.subscribed && cacheModel.direct) {
-				if (subscribed) {
-					cacheModel.setSubscribed(true);
-					this._send('subscribe.' + modelId);
-				} else {
-					this._setStale(modelId);
-				}
-
-			}
-		}
-	}
-
-	_removeCacheItem(cacheItem) {
-		if (cacheItem.subscribed || cacheItem.indirect) {
-			return;
+			return false;
 		}
 
-		let item = cacheItem.item, cacheModel;
+		if (cacheItem.subscribed) {
+			return false;
+		}
+
 		if (cacheItem.isCollection) {
+			let item = cacheItem.item, cacheModel;
 			for (let model of item) {
-				let modelId = model.getResourceId();
-				cacheModel = this.cache[modelId];
+				let rid = model.getResourceId();
+				cacheModel = this.cache[rid];
 				if (!cacheModel) {
 					throw "Collection model not found in cache";
 				}
 
-				let indirect = cacheModel.removeIndirect();
-				// Are we missing an existing subscription to the model?
-				if (!indirect && !cacheModel.direct) {
-					// If there are no references, just delete it from the cache
-					delete this.cache[modelId];
-				}
+				cacheModel.removeIndirect();
+				this._tryDelete(cacheModel);
 			}
 		}
 
 		delete this.cache[cacheItem.rid];
+		return true;
 	}
 
-	_getCachedModel(rid, data, addIndirect = false) {
+	_getCachedResource(rid, data, addIndirect, collectionFactory) {
 		let cacheItem = this.cache[rid];
 		if (cacheItem) {
-			// A data object on existing cacheItem indicates
-			// the item is stale and we should update it.
-			if (data) {
-				this._handleChangeEvent(rid, cacheItem, 'change', data);
-			}
-			if (addIndirect) {
-				cacheItem.addIndirect();
+			if (cacheItem.item) {
+				// A data object on existing cacheItem indicates
+				// the item is stale and we should update it.
+				if (data) {
+					this._syncResource(cacheItem, data);
+				}
+				if (addIndirect) {
+					cacheItem.addIndirect();
+				}
+
+				return cacheItem;
 			}
 		} else {
-			let modelType = this._getModelType(rid);
 			cacheItem = new CacheItem(rid, this._unsubscribeCacheItem);
-			if (addIndirect) {
-				cacheItem.addIndirect();
-			}
-			cacheItem
-				.setItem(modelType.modelFactory(
-					this,
-					rid,
-					data
-				))
-				.setType(modelType);
-
 			this.cache[rid] = cacheItem;
 		}
 
+		if (addIndirect) {
+			cacheItem.addIndirect();
+		}
+
+		if (!data) {
+			throw new Error("No data for resource ID " + rid);
+		}
+
+		if (Array.isArray(data)) {
+			let modelConts = data.map(m => {
+				let cacheModel = this._getCachedResource(m.rid, m.data, true);
+				return {
+					rid: m.rid,
+					model: cacheModel.item
+				};
+			});
+
+			cacheItem.setItem(collectionFactory(this, rid, modelConts), true);
+		} else {
+			let modelType = this._getModelType(rid);
+			cacheItem.setItem(modelType.modelFactory(this, rid, data), false)
+				.setType(modelType);
+		}
+
 		return cacheItem;
+	}
+
+	// Syncronizes stale cached item with new data
+	_syncResource(cacheItem, data) {
+		if (cacheItem.isCollection !== Array.isArray(data)) {
+			throw new Error("Resource type inconsistency");
+		}
+
+		if (cacheItem.isCollection) {
+			let collection = cacheItem.item;
+			let i = collection.length;
+			let a = new Array(i);
+			while (i--) {
+				a[i] = collection.atIndex(i).getResourceId();
+			}
+
+			let b = data.map(m => m.rid);
+			this._patchDiff(a, b,
+				(id, m, n, idx) => {
+					if (data[n].data) {
+						this._getCachedResource(id, data[n].data);
+					}
+				},
+				(id, n, idx) => this._handleAddEvent(cacheItem, 'add', {
+					rid: id,
+					data: data[n].data,
+					idx: idx
+				}),
+				(id, m, idx) => this._handleRemoveEvent(cacheItem, 'remove', {
+					rid: id
+				})
+			);
+		} else {
+			this._handleChangeEvent(cacheItem, 'change', data);
+		}
+	}
+
+	_unsubscribeCacheItem(cacheItem) {
+		if (!cacheItem.subscribed) {
+			return this._tryDelete(cacheItem);
+		}
+
+		this._subscribeReferred(cacheItem);
+
+		if (this.connected) {
+			this._send('unsubscribe.' + cacheItem.rid)
+				.then(() => {
+					cacheItem.setSubscribed(false);
+					this._tryDelete(cacheItem);
+				})
+				.catch(err => this._tryDelete(cacheItem));
+		} else {
+			this._tryDelete(cacheItem);
+		}
+	}
+
+	_subscribeReferred(cacheItem) {
+		if (!this.connected) {
+			return;
+		}
+
+		if (cacheItem.isCollection) {
+			let item = cacheItem.item, cacheModel;
+			for (let model of item) {
+				let rid = model.getResourceId();
+				cacheModel = this.cache[rid];
+				if (!cacheModel) {
+					throw new Error("Collection model not found in cache");
+				}
+
+				// Are we missing an existing subscription to the model while having direct references
+				// and this being the last indirect, soon to be removed?
+				if (!cacheModel.subscribed && cacheModel.direct && cacheModel.indirect === 1) {
+					cacheModel.setSubscribed(true);
+					this._send('subscribe.' + rid)
+						.catch(this._handleFailedSubscribe.bind(this, cacheModel));
+				}
+			}
+		}
+	}
+
+	_handleFailedSubscribe(cacheItem, err) {
+		cacheItem.setSubscribed(false);
+		this._tryDelete(cacheItem);
 	}
 
 	_getModelType(resourceName) {
