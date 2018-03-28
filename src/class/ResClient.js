@@ -95,6 +95,14 @@ class ResClient {
 	}
 
 	/**
+	 * Gets the host URL to the RES API
+	 * @returns {string} Host URL
+	 */
+	getHostUrl() {
+		return this.hostUrl;
+	}
+
+	/**
 	 * Attach an  event handler function for one or more instance events.
 	 * @param {?string} events One or more space-separated events. Null means any event.
 	 * @param {eventCallback} handler A function to execute when the event is emitted.
