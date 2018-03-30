@@ -4,10 +4,10 @@
 /yarn.lock
 
 # Build files.
-# Put in root folder
 /class
 /def
 /*.js
+/*.tgz
 
 # Editor specifics
 .vscode/*

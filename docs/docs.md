@@ -31,6 +31,7 @@ ResClient is a client implementing the RES-Client protocol.
     * [new ResClient(hostUrl, [opt])](#new_ResClient_new)
     * [.connect()](#ResClient+connect) ⇒ <code>Promise</code>
     * [.disconnect()](#ResClient+disconnect)
+    * [.getHostUrl()](#ResClient+getHostUrl) ⇒ <code>string</code>
     * [.on(events, handler)](#ResClient+on)
     * [.off(events, [handler])](#ResClient+off)
     * [.setOnConnect(onConnect)](#ResClient+setOnConnect) ⇒ <code>this</code>
@@ -38,6 +39,7 @@ ResClient is a client implementing the RES-Client protocol.
     * [.unregisterModelType(modelTypeId)](#ResClient+unregisterModelType) ⇒ <code>object</code>
     * [.getResource(rid, [collectionFactory])](#ResClient+getResource) ⇒ <code>Promise.&lt;(Model\|Collection)&gt;</code>
     * [.createModel(collectionId, props)](#ResClient+createModel) ⇒ <code>Promise.&lt;Model&gt;</code>
+    * [._tryDelete(cacheItem)](#ResClient+_tryDelete) ⇒ <code>boolean</code>
 
 <a name="new_ResClient_new"></a>
 
@@ -68,6 +70,13 @@ Disconnects any current connection and stops attempts
 of reconnecting.
 
 **Kind**: instance method of [<code>ResClient</code>](#ResClient)  
+<a name="ResClient+getHostUrl"></a>
+
+### resClient.getHostUrl() ⇒ <code>string</code>
+Gets the host URL to the RES API
+
+**Kind**: instance method of [<code>ResClient</code>](#ResClient)  
+**Returns**: <code>string</code> - Host URL  
 <a name="ResClient+on"></a>
 
 ### resClient.on(events, handler)
@@ -152,6 +161,19 @@ Create a new model resource
 | collectionId | <code>string</code> | Existing collection in which the resource is to be created |
 | props | <code>object</code> | Model properties |
 
+<a name="ResClient+_tryDelete"></a>
+
+### resClient._tryDelete(cacheItem) ⇒ <code>boolean</code>
+Tries to delete the cached item.
+It will delete if there are no direct listeners, indirect references, or any subscription.
+
+**Kind**: instance method of [<code>ResClient</code>](#ResClient)  
+**Returns**: <code>boolean</code> - True if the item was deleted from cache, otherwise false  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| cacheItem | <code>object</code> | Cache item to delete |
+
 <a name="ResCollection"></a>
 
 ## ResCollection
@@ -164,10 +186,10 @@ ResCollection represents a collection provided over the RES API.
     * [new ResCollection(api, rid, data, [opt])](#new_ResCollection_new)
     * [.length](#ResCollection+length)
     * [.getResourceId()](#ResCollection+getResourceId) ⇒ <code>string</code>
-    * [.on(events, [handler])](#ResCollection+on) ⇒ <code>this</code>
-    * [.off(events, [handler])](#ResCollection+off) ⇒ <code>this</code>
+    * [.on([events], [handler])](#ResCollection+on) ⇒ <code>this</code>
+    * [.off([events], [handler])](#ResCollection+off) ⇒ <code>this</code>
     * [.get(id)](#ResCollection+get) ⇒ <code>\*</code>
-    * [.indexOfId(id)](#ResCollection+indexOfId) ⇒ <code>number</code>
+    * [.indexOf(id)](#ResCollection+indexOf) ⇒ <code>number</code>
     * [.atIndex(idx)](#ResCollection+atIndex) ⇒ <code>module:modapp~Model</code>
     * [.create(props)](#ResCollection+create) ⇒ <code>Promise.&lt;Model&gt;</code>
     * [.remove(modelId)](#ResCollection+remove) ⇒ <code>Promise</code>
@@ -202,20 +224,22 @@ Collection resource ID
 **Returns**: <code>string</code> - Resource ID  
 <a name="ResCollection+on"></a>
 
-### resCollection.on(events, [handler]) ⇒ <code>this</code>
+### resCollection.on([events], [handler]) ⇒ <code>this</code>
 Attach a collection event handler function for one or more events.
+If no event or handler is provided, the collection will still be considered listened to,
+until a matching off call without arguments is made.
 Available events are 'add', 'remove', and 'move'.
 
 **Kind**: instance method of [<code>ResCollection</code>](#ResCollection)  
 
 | Param | Type | Description |
 | --- | --- | --- |
-| events | <code>string</code> | One or more space-separated events. Null means any event. |
+| [events] | <code>string</code> | One or more space-separated events. Null means any event. |
 | [handler] | [<code>eventCallback</code>](#eventCallback) | Handler function to execute when the event is emitted. |
 
 <a name="ResCollection+off"></a>
 
-### resCollection.off(events, [handler]) ⇒ <code>this</code>
+### resCollection.off([events], [handler]) ⇒ <code>this</code>
 Remove a collection event handler function.
 Available events are 'add', 'remove', and 'move'.
 
@@ -223,7 +247,7 @@ Available events are 'add', 'remove', and 'move'.
 
 | Param | Type | Description |
 | --- | --- | --- |
-| events | <code>string</code> | One or more space-separated events. Null means any event. |
+| [events] | <code>string</code> | One or more space-separated events. Null means any event. |
 | [handler] | [<code>eventCallback</code>](#eventCallback) | Handler function to remove. |
 
 <a name="ResCollection+get"></a>
@@ -238,17 +262,17 @@ Get a model from the collection by id
 | --- | --- | --- |
 | id | <code>string</code> | Id of the model |
 
-<a name="ResCollection+indexOfId"></a>
+<a name="ResCollection+indexOf"></a>
 
-### resCollection.indexOfId(id) ⇒ <code>number</code>
-Retrieves the order index of an model.
+### resCollection.indexOf(id) ⇒ <code>number</code>
+Retrieves the order index of a model.
 
 **Kind**: instance method of [<code>ResCollection</code>](#ResCollection)  
 **Returns**: <code>number</code> - Order index of the model. -1 if the model id doesn't exist.  
 
 | Param | Type | Description |
 | --- | --- | --- |
-| id | <code>string</code> | Id of the model |
+| id | <code>string</code> \| <code>Model</code> | Id of the model or the model object |
 
 <a name="ResCollection+atIndex"></a>
 
@@ -299,7 +323,7 @@ ResModel represents a model provided over the RES API.
 * [ResModel](#ResModel)
     * [new ResModel(api, rid, data, [opt])](#new_ResModel_new)
     * [.getResourceId()](#ResModel+getResourceId) ⇒ <code>string</code>
-    * [.on(events, [handler])](#ResModel+on) ⇒ <code>this</code>
+    * [.on([events], [handler])](#ResModel+on) ⇒ <code>this</code>
     * [.off(events, [handler])](#ResModel+off) ⇒ <code>this</code>
     * [.set(props)](#ResModel+set) ⇒ <code>Promise.&lt;object&gt;</code>
     * [.call(method, params)](#ResModel+call) ⇒ <code>Promise.&lt;object&gt;</code>
@@ -327,15 +351,17 @@ Model resource ID
 **Returns**: <code>string</code> - Resource ID  
 <a name="ResModel+on"></a>
 
-### resModel.on(events, [handler]) ⇒ <code>this</code>
+### resModel.on([events], [handler]) ⇒ <code>this</code>
 Attach a model event handler function for one or more events.
+If no event or handler is provided, the model will still be considered listened to,
+until a matching off call without arguments is made.
 Available event is 'change'.
 
 **Kind**: instance method of [<code>ResModel</code>](#ResModel)  
 
 | Param | Type | Description |
 | --- | --- | --- |
-| events | <code>string</code> | One or more space-separated events. Null means any event. |
+| [events] | <code>string</code> | One or more space-separated events. Null means any event. |
 | [handler] | [<code>eventCallback</code>](#eventCallback) | Handler function to execute when the event is emitted. |
 
 <a name="ResModel+off"></a>
