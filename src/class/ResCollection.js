@@ -57,8 +57,10 @@ class ResCollection {
 
 	/**
 	 * Attach a collection event handler function for one or more events.
+	 * If no event or handler is provided, the collection will still be considered listened to,
+	 * until a matching off call without arguments is made.
 	 * Available events are 'add', 'remove', and 'move'.
-	 * @param {?string} events One or more space-separated events. Null means any event.
+	 * @param {?string} [events] One or more space-separated events. Null means any event.
 	 * @param {eventCallback} [handler] Handler function to execute when the event is emitted.
 	 * @returns {this}
 	 */
@@ -70,7 +72,7 @@ class ResCollection {
 	 /**
 	 * Remove a collection event handler function.
 	 * Available events are 'add', 'remove', and 'move'.
-	 * @param {?string} events One or more space-separated events. Null means any event.
+	 * @param {?string} [events] One or more space-separated events. Null means any event.
 	 * @param {eventCallback} [handler] Handler function to remove.
 	 * @returns {this}
 	 */

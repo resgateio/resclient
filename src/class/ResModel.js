@@ -35,8 +35,10 @@ class ResModel {
 
 	/**
 	 * Attach a model event handler function for one or more events.
+	 * If no event or handler is provided, the model will still be considered listened to,
+	 * until a matching off call without arguments is made.
 	 * Available event is 'change'.
-	 * @param {?string} events One or more space-separated events. Null means any event.
+	 * @param {?string} [events] One or more space-separated events. Null means any event.
 	 * @param {eventCallback} [handler] Handler function to execute when the event is emitted.
 	 * @returns {this}
 	 */

@@ -367,6 +367,17 @@ describe("ResClient", () => {
 			});
 		});
 
+		it("does not unsubscribe to model being listened to without handler", () => {
+			return getServerResource('service.model', modelData).then(model => {
+				model.on();
+
+				return waitAWhile().then(flushRequests).then(() => {
+					let req = server.getNextRequest();
+					expect(req).toBe(undefined);
+				});
+			});
+		});
+
 		it("unsubscribes to model after it is no longer listened to", () => {
 			return getServerResource('service.model', modelData).then(model => {
 				model.on('change', cb);
@@ -395,6 +406,30 @@ describe("ResClient", () => {
 									expect(server.pendingRequests()).toBe(0);
 								});
 							});
+						});
+					});
+				});
+			});
+		});
+
+		it("unsubscribes to model after it is no longer listened to without handler", () => {
+			return getServerResource('service.model', modelData).then(model => {
+				model.on();
+
+				return waitAWhile().then(flushRequests).then(() => {
+					expect(server.pendingRequests()).toBe(0);
+					model.off();
+
+					return waitAWhile().then(flushRequests).then(() => {
+						expect(server.error).toBe(null);
+						let req = server.getNextRequest();
+						expect(req).not.toBe(undefined);
+						expect(req.method).toBe('unsubscribe.service.model');
+						server.sendResponse(req, null);
+
+						// Wait for the unsubscribe response
+						return flushRequests().then(() => {
+							expect(server.error).toBe(null);
 						});
 					});
 				});
