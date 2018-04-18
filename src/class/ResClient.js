@@ -181,7 +181,7 @@ class ResClient {
 	 * Get a resource from the backend
 	 * @param {string} rid Resource ID
 	 * @param {function} [collectionFactory] Collection factory function.
-	 * @return {Promise.<Model|Collection>} Promise of the resourcce
+	 * @return {Promise.<ResModel|ResCollection>} Promise of the resourcce
 	 */
 	getResource(rid, collectionFactory = defaultCollectionFactory) {
 		// Check for resource in cache
@@ -211,7 +211,7 @@ class ResClient {
 	 * Create a new model resource
 	 * @param {string} collectionId Existing collection in which the resource is to be created
 	 * @param {?object} props Model properties
-	 * @returns {Promise.<Model>} Promise of the created model
+	 * @returns {Promise.<ResModel>} Promise of the created model
 	 */
 	createModel(collectionId, props) {
 		return this._send('call.' + collectionId + '.new', props).then(response => {
@@ -646,6 +646,7 @@ class ResClient {
 	 * It will delete if there are no direct listeners, indirect references, or any subscription.
 	 * @param {object} cacheItem Cache item to delete
 	 * @returns {boolean} True if the item was deleted from cache, otherwise false
+	 * @private
 	 */
 	_tryDelete(cacheItem) {
 		if (cacheItem.indirect) {

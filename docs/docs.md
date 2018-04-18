@@ -37,9 +37,8 @@ ResClient is a client implementing the RES-Client protocol.
     * [.setOnConnect(onConnect)](#ResClient+setOnConnect) ⇒ <code>this</code>
     * [.registerModelType(modelType)](#ResClient+registerModelType)
     * [.unregisterModelType(modelTypeId)](#ResClient+unregisterModelType) ⇒ <code>object</code>
-    * [.getResource(rid, [collectionFactory])](#ResClient+getResource) ⇒ <code>Promise.&lt;(Model\|Collection)&gt;</code>
-    * [.createModel(collectionId, props)](#ResClient+createModel) ⇒ <code>Promise.&lt;Model&gt;</code>
-    * [._tryDelete(cacheItem)](#ResClient+_tryDelete) ⇒ <code>boolean</code>
+    * [.getResource(rid, [collectionFactory])](#ResClient+getResource) ⇒ <code>Promise.&lt;(ResModel\|ResCollection)&gt;</code>
+    * [.createModel(collectionId, props)](#ResClient+createModel) ⇒ [<code>Promise.&lt;ResModel&gt;</code>](#ResModel)
 
 <a name="new_ResClient_new"></a>
 
@@ -137,11 +136,11 @@ Unregister a model type
 
 <a name="ResClient+getResource"></a>
 
-### resClient.getResource(rid, [collectionFactory]) ⇒ <code>Promise.&lt;(Model\|Collection)&gt;</code>
+### resClient.getResource(rid, [collectionFactory]) ⇒ <code>Promise.&lt;(ResModel\|ResCollection)&gt;</code>
 Get a resource from the backend
 
 **Kind**: instance method of [<code>ResClient</code>](#ResClient)  
-**Returns**: <code>Promise.&lt;(Model\|Collection)&gt;</code> - Promise of the resourcce  
+**Returns**: <code>Promise.&lt;(ResModel\|ResCollection)&gt;</code> - Promise of the resourcce  
 
 | Param | Type | Description |
 | --- | --- | --- |
@@ -150,29 +149,16 @@ Get a resource from the backend
 
 <a name="ResClient+createModel"></a>
 
-### resClient.createModel(collectionId, props) ⇒ <code>Promise.&lt;Model&gt;</code>
+### resClient.createModel(collectionId, props) ⇒ [<code>Promise.&lt;ResModel&gt;</code>](#ResModel)
 Create a new model resource
 
 **Kind**: instance method of [<code>ResClient</code>](#ResClient)  
-**Returns**: <code>Promise.&lt;Model&gt;</code> - Promise of the created model  
+**Returns**: [<code>Promise.&lt;ResModel&gt;</code>](#ResModel) - Promise of the created model  
 
 | Param | Type | Description |
 | --- | --- | --- |
 | collectionId | <code>string</code> | Existing collection in which the resource is to be created |
 | props | <code>object</code> | Model properties |
-
-<a name="ResClient+_tryDelete"></a>
-
-### resClient._tryDelete(cacheItem) ⇒ <code>boolean</code>
-Tries to delete the cached item.
-It will delete if there are no direct listeners, indirect references, or any subscription.
-
-**Kind**: instance method of [<code>ResClient</code>](#ResClient)  
-**Returns**: <code>boolean</code> - True if the item was deleted from cache, otherwise false  
-
-| Param | Type | Description |
-| --- | --- | --- |
-| cacheItem | <code>object</code> | Cache item to delete |
 
 <a name="ResCollection"></a>
 
