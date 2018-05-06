@@ -11,10 +11,10 @@ const defaultModelType = {
 		return new ResModel(api, rid, data);
 	}
 };
-
 const defaultCollectionFactory = function(api, rid, data) {
 	return new ResCollection(api, rid, data);
 };
+const actionDelete = { action: 'delete' };
 
 const defaultNamespace = 'resclient';
 const reconnectDelay = 3000;
@@ -181,7 +181,7 @@ class ResClient {
 	 * Get a resource from the backend
 	 * @param {string} rid Resource ID
 	 * @param {function} [collectionFactory] Collection factory function.
-	 * @return {Promise.<ResModel|ResCollection>} Promise of the resourcce
+	 * @return {Promise.<(ResModel|ResCollection)>} Promise of the resourcce
 	 */
 	getResource(rid, collectionFactory = defaultCollectionFactory) {
 		// Check for resource in cache
@@ -225,10 +225,31 @@ class ResClient {
 		return this._send('call.' + collectionId + '.remove', { rid });
 	}
 
+	/**
+	 * Calls the set method to update model properties.
+	 * @param {string} modelId Model resource ID.
+	 * @param {object} props Properties. Set value to undefined to delete a property.
+	 * @returns {Promise.<object>} Promise of the call being completed.
+	 */
 	setModel(modelId, props) {
+		props = Object.assign({}, props);
+		// Replace undefined with actionDelete object
+		Object.keys(props).forEach(k => {
+			if (props[k] === undefined) {
+				props[k] = actionDelete;
+			}
+		});
+
 		return this._send('call.' + modelId + '.set', props);
 	}
 
+	/**
+	 * Calls a method on the model.
+	 * @param {string} modelId Model resource ID.
+	 * @param {string} method Method name
+	 * @param {*} params Method parameters
+	 * @returns {Promise.<object>} Promise of the call result.
+	 */
 	callModel(modelId, method, params) {
 		return this._send('call.' + modelId + '.' + method, params);
 	}
@@ -378,6 +399,19 @@ class ResClient {
 	}
 
 	_handleChangeEvent(cacheItem, event, data) {
+		// Set deleted properties to undefined
+		let v;
+		for (let key in data) {
+			v = data[key];
+			if (v !== null && typeof v === 'object') {
+				if (v.action === 'delete') {
+					data[key] = undefined;
+				} else {
+					throw new Error("Unsupported model change value: ", v);
+				}
+			}
+		}
+
 		if (cacheItem.type.change) {
 			cacheItem.type.change(cacheItem.item, data);
 		} else {
