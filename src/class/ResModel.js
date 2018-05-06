@@ -61,7 +61,7 @@ class ResModel {
 
 	/**
 	 * Calls the set method to update model properties.
-	 * @param {object} props Properties
+	 * @param {object} props Properties. Set value to undefined to delete a property.
 	 * @returns {Promise.<object>} Promise of the call being completed.
 	 */
 	set(props) {
@@ -91,6 +91,7 @@ class ResModel {
 		}
 
 		let changed = null;
+		let v;
 		if (this._definition) {
 			changed = obj.update(this, props, this._definition);
 		} else {
@@ -99,10 +100,15 @@ class ResModel {
 					key.substr(0, 1) !== '_' &&
 					(this.hasOwnProperty(key) || !this[key])
 				) {
-					if (props[key] !== this[key]) {
+					v = props[key];
+					if (v !== this[key]) {
 						changed = changed || {};
 						changed[key] = this[key];
-						this[key] = props[key];
+						if (v === undefined) {
+							delete this[key];
+						} else {
+							this[key] = v;
+						}
 					}
 				}
 			}
