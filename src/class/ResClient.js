@@ -439,14 +439,14 @@ class ResClient {
 			throw new Error("Remove event on model");
 		}
 
-		let rid = data.rid;
-		let cacheModel = this.cache[rid];
+		let idx = data.idx;
+		let item = cacheItem.item.__remove(idx);
+		this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + cacheItem.rid + '.' + event, { item, idx });
+
+		let cacheModel = this.cache[item.getResourceId()];
 		if (!cacheModel) {
 			throw new Error("Removed model is not in cache");
 		}
-
-		let idx = cacheItem.item.__remove(rid);
-		this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + cacheItem.rid + '.' + event, { item: cacheModel.item, idx });
 
 		cacheModel.removeIndirect();
 		this._tryDelete(cacheModel);
