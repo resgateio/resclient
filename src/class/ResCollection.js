@@ -154,23 +154,23 @@ class ResCollection {
 	/**
 	 * Remove a model from the collection.
 	 * Should only be called from api module.
-	 * @param {string} modelId Model resource id
-	 * @returns {number} Index of the model before removal. -1 if the model id doesn't exist
+	 * @param {number} idx Index of the item to remove
+	 * @returns {*} Removed item or undefined if no item was removed
 	 * @private
 	 */
-	__remove(modelId) {
-		let model = this._map.get(modelId);
-		if (!model) {
-			return -1;
+	__remove(idx) {
+		let model = this._map[idx];
+		if (model === undefined) {
+			return model;
 		}
 
-		let idx = this._map.remove(modelId);
+		this._map.remove(model.getResourceId());
 
 		if (this._idAttribute) {
 			delete this._modelResources[this._idAttribute(model)];
 		}
 
-		return idx;
+		return model;
 	}
 
 	toJSON() {
