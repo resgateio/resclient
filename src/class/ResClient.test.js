@@ -83,11 +83,27 @@ describe("ResClient", () => {
 		foo: "bar",
 		int: 42
 	};
+	const modelResources = {
+		models: {
+			"service.model": modelData
+		}
+	};
+	const collectionModels = {
+		'service.item.10': { id: 10, name: "Ten" },
+		'service.item.20': { id: 20, name: "Twenty" },
+		'service.item.30': { id: 30, name: "Thirty" }
+	};
 	const collectionData = [
-		{ rid: 'service.item.10', data: { id: 10, name: "Ten" }},
-		{ rid: 'service.item.20', data: { id: 20, name: "Twenty" }},
-		{ rid: 'service.item.30', data: { id: 30, name: "Thirty" }}
+		{ rid: 'service.item.10' },
+		{ rid: 'service.item.20' },
+		{ rid: 'service.item.30' }
 	];
+	const collectionResources = {
+		models: collectionModels,
+		collections: {
+			'service.collection': collectionData
+		}
+	};
 
 	function flushPromises(depth = 2) {
 		return new Promise(resolve => setImmediate(() => {
@@ -191,7 +207,7 @@ describe("ResClient", () => {
 				let req = server.getNextRequest();
 				expect(req).not.toBe(undefined);
 				expect(req.method).toBe('subscribe.service.model');
-				server.sendResponse(req, modelData);
+				server.sendResponse(req, modelResources);
 				jest.runOnlyPendingTimers();
 				expect(server.error).toBe(null);
 				expect(server.pendingRequests()).toBe(0);
@@ -201,7 +217,8 @@ describe("ResClient", () => {
 		});
 
 		it("gets model resource from cache on second request", () => {
-			return getServerResource('service.model', modelData).then(model => {
+			return getServerResource('service.model', modelResources).then(model => {
+				expect(model.foo).toBe("bar");
 				return client.getResource('service.model').then(modelSecond => {
 					expect(model).toBe(modelSecond);
 
@@ -214,7 +231,7 @@ describe("ResClient", () => {
 		});
 
 		it("unsubscribes model not listened to, removing it from cache", () => {
-			return getServerResource('service.model', modelData).then(model => {
+			return getServerResource('service.model', modelResources).then(model => {
 				// Cause unsubscribe by waiting
 				return waitAWhile().then(flushRequests).then(() => {
 					expect(server.error).toBe(null);
@@ -227,7 +244,7 @@ describe("ResClient", () => {
 					return flushRequests().then(() => {
 						expect(server.error).toBe(null);
 
-						return getServerResource('service.model', modelData).then(modelSecond => {
+						return getServerResource('service.model', modelResources).then(modelSecond => {
 							expect(model).not.toBe(modelSecond);
 
 							let req = server.getNextRequest();
@@ -273,14 +290,15 @@ describe("ResClient", () => {
 				let req = server.getNextRequest();
 				expect(req).not.toBe(undefined);
 				expect(req.method).toBe('subscribe.service.collection');
-				server.sendResponse(req, collectionData);
+				server.sendResponse(req, collectionResources);
 
 				return flushRequests().then(() => promise);
 			});
 		});
 
 		it("gets collection resource and collection models from cache on second request", () => {
-			return getServerResource('service.collection', collectionData).then(collection => {
+			return getServerResource('service.collection', collectionResources).then(collection => {
+				expect(collection.atIndex(0).name).toBe("Ten");
 				return client.getResource('service.collection').then(collectionSecond => {
 					expect(collection).toBe(collectionSecond);
 
@@ -298,12 +316,18 @@ describe("ResClient", () => {
 		});
 
 		it("gets collection model from cache if already loaded", () => {
-			return getServerResource(collectionData[0].rid, collectionData[0].data).then(model => {
-				return getServerResource('service.collection', [
-					{ rid: collectionData[0].rid },
-					collectionData[1],
-					collectionData[2]
-				]).then(collection => {
+			let rid = collectionData[0].rid;
+			models = {};
+			models[rid] = collectionModels[rid];
+			return getServerResource(rid, { models }).then(model => {
+				models = Object.assign({}, collectionModels);
+				delete models[rid];
+				return getServerResource('service.collection', {
+					models,
+					collections: {
+						'service.collection': collectionData
+					}
+				}).then(collection => {
 					expect(collection.atIndex(0)).toBe(model);
 					return flushRequests().then(() => {
 						let req = server.getNextRequest();
@@ -314,7 +338,7 @@ describe("ResClient", () => {
 		});
 
 		it("unsubscribes collection and its models not listened to, removing it from cache", () => {
-			return getServerResource('service.collection', collectionData).then(collection => {
+			return getServerResource('service.collection', collectionResources).then(collection => {
 				let model = collection.atIndex(0);
 
 				// Cause unsubscribe by waiting
@@ -330,15 +354,20 @@ describe("ResClient", () => {
 						expect(server.error).toBe(null);
 
 						// Get model again
-						return getServerResource(collectionData[0].rid, collectionData[0].data).then(modelSecond => {
+						let rid = collectionData[0].rid;
+						let models = {};
+						models[rid] = collectionModels[rid];
+						return getServerResource(rid, { models }).then(modelSecond => {
 							expect(model).not.toBe(modelSecond);
-
 							// Get collection again
-							return getServerResource('service.collection', [
-								{ rid: collectionData[0].rid },
-								collectionData[1],
-								collectionData[2]
-							]).then(collectionSecond => {
+							models = Object.assign({}, collectionModels);
+							delete models[rid];
+							return getServerResource('service.collection', {
+								models,
+								collections: {
+									'service.collection': collectionData
+								}
+							}).then(collectionSecond => {
 								expect(collection).not.toBe(collectionSecond);
 								expect(collectionSecond.atIndex(0)).toBe(modelSecond);
 
@@ -357,7 +386,7 @@ describe("ResClient", () => {
 	describe("model.on", () => {
 
 		it("does not unsubscribe to model being listened to", () => {
-			return getServerResource('service.model', modelData).then(model => {
+			return getServerResource('service.model', modelResources).then(model => {
 				model.on('change', cb);
 
 				return waitAWhile().then(flushRequests).then(() => {
@@ -368,7 +397,7 @@ describe("ResClient", () => {
 		});
 
 		it("does not unsubscribe to model being listened to without handler", () => {
-			return getServerResource('service.model', modelData).then(model => {
+			return getServerResource('service.model', modelResources).then(model => {
 				model.on();
 
 				return waitAWhile().then(flushRequests).then(() => {
@@ -379,7 +408,7 @@ describe("ResClient", () => {
 		});
 
 		it("unsubscribes to model after it is no longer listened to", () => {
-			return getServerResource('service.model', modelData).then(model => {
+			return getServerResource('service.model', modelResources).then(model => {
 				model.on('change', cb);
 				model.on('change', cb2);
 
@@ -401,7 +430,7 @@ describe("ResClient", () => {
 							return flushRequests().then(() => {
 								expect(server.error).toBe(null);
 
-								return getServerResource('service.model', modelData).then(modelSecond => {
+								return getServerResource('service.model', modelResources).then(modelSecond => {
 									expect(model).not.toBe(modelSecond);
 									expect(server.pendingRequests()).toBe(0);
 								});
@@ -413,7 +442,7 @@ describe("ResClient", () => {
 		});
 
 		it("unsubscribes to model after it is no longer listened to without handler", () => {
-			return getServerResource('service.model', modelData).then(model => {
+			return getServerResource('service.model', modelResources).then(model => {
 				model.on();
 
 				return waitAWhile().then(flushRequests).then(() => {
@@ -437,7 +466,7 @@ describe("ResClient", () => {
 		});
 
 		it("does not unsubscribe to model re-listened to before unsubscribe delay", () => {
-			return getServerResource('service.model', modelData).then(model => {
+			return getServerResource('service.model', modelResources).then(model => {
 				model.on('change', cb);
 
 				return waitAWhile().then(flushRequests).then(() => {
@@ -455,7 +484,7 @@ describe("ResClient", () => {
 		});
 
 		it("emits a change event on change", () => {
-			return getServerResource('service.model', modelData).then(model => {
+			return getServerResource('service.model', modelResources).then(model => {
 				model.on('change', cb);
 
 				server.sendEvent('service.model', 'change', { foo: 'baz' });
@@ -472,7 +501,7 @@ describe("ResClient", () => {
 		});
 
 		it("emits a custom event", () => {
-			return getServerResource('service.model', modelData).then(model => {
+			return getServerResource('service.model', modelResources).then(model => {
 				model.on('custom', cb);
 
 				server.sendEvent('service.model', 'custom', { foo: 'baz' });
@@ -489,7 +518,7 @@ describe("ResClient", () => {
 		});
 
 		it("emits an event received before unsubscribe response", () => {
-			return getServerResource('service.model', modelData).then(model => {
+			return getServerResource('service.model', modelResources).then(model => {
 				// Cause unsubscribe by waiting
 				return waitAWhile().then(flushRequests).then(() => {
 					let req = server.getNextRequest();
@@ -500,7 +529,7 @@ describe("ResClient", () => {
 					return flushRequests().then(() => {
 						expect(server.error).toBe(null);
 
-						return getServerResource('service.model', modelData).then(modelSecond => {
+						return getServerResource('service.model', modelResources).then(modelSecond => {
 							expect(model).not.toBe(modelSecond);
 
 							let req = server.getNextRequest();
@@ -512,7 +541,7 @@ describe("ResClient", () => {
 		});
 
 		it("tries to resubscribes a while after unsubscribe event", () => {
-			return getServerResource('service.model', modelData).then(model => {
+			return getServerResource('service.model', modelResources).then(model => {
 				model.on('unsubscribe', cb);
 
 				server.sendEvent('service.model', 'unsubscribe');
@@ -531,14 +560,14 @@ describe("ResClient", () => {
 		});
 
 		it("instantly removes stale item from cache when no longer listened to", () => {
-			return getServerResource('service.model', modelData).then(model => {
+			return getServerResource('service.model', modelResources).then(model => {
 				model.on('custom', cb);
 
 				server.sendEvent('service.model', 'unsubscribe');
 				return flushRequests().then(() => {
 					model.off('custom', cb);
 
-					return getServerResource('service.model', modelData).then(modelSecond => {
+					return getServerResource('service.model', modelResources).then(modelSecond => {
 						expect(model).not.toBe(modelSecond);
 					});
 				});
@@ -553,7 +582,7 @@ describe("ResClient", () => {
 	describe("collection.on", () => {
 
 		it("does not unsubscribe to collection being listened to", () => {
-			return getServerResource('service.collection', collectionData).then(collection => {
+			return getServerResource('service.collection', collectionResources).then(collection => {
 				collection.on('add', cb);
 
 				return waitAWhile().then(flushRequests).then(() => {
@@ -564,7 +593,7 @@ describe("ResClient", () => {
 		});
 
 		it("subscribes to listened models before unsubscribing to the collection", () => {
-			return getServerResource('service.collection', collectionData).then(collection => {
+			return getServerResource('service.collection', collectionResources).then(collection => {
 				let model = collection.atIndex(0);
 				model.on('change', cb);
 
@@ -601,13 +630,19 @@ describe("ResClient", () => {
 
 		it("unsubscribes to previously subscribed model while included in collection", () => {
 			// Get model
-			return getServerResource(collectionData[0].rid, collectionData[0].data).then(model => {
+			let rid = collectionData[0].rid;
+			let models = {};
+			models[rid] = collectionModels[rid];
+			return getServerResource(rid, { models }).then(model => {
 				// Get collection
-				return getServerResource('service.collection', [
-					{ rid: collectionData[0].rid },
-					collectionData[1],
-					collectionData[2]
-				]).then(collection => {
+				models = Object.assign({}, collectionModels);
+				delete models[rid];
+				return getServerResource('service.collection', {
+					models,
+					collections: {
+						'service.collection': collectionData
+					}
+				}).then(collection => {
 					expect(collection.atIndex(0)).toBe(model);
 
 					return waitAWhile().then(flushRequests).then(() => {
@@ -634,12 +669,12 @@ describe("ResClient", () => {
 		});
 
 		it("emits an add event on add", () => {
-			return getServerResource('service.collection', collectionData).then(collection => {
+			return getServerResource('service.collection', collectionResources).then(collection => {
 				collection.on('add', cb);
 
-				server.sendEvent('service.collection', 'add', { rid: 'service.item.35', data: { id: 35, name: "Thirtyfive" }, idx: 3 });
-				server.sendEvent('service.collection', 'add', { rid: 'service.item.15', data: { id: 15, name: "Fifteen" }, idx: 1 });
-				server.sendEvent('service.collection', 'add', { rid: 'service.item.5', data: { id: 5, name: "Five" }, idx: 0 });
+				server.sendEvent('service.collection', 'add', { value: { rid: 'service.item.35' }, models: { 'service.item.35': { id: 35, name: "Thirtyfive" }}, idx: 3 });
+				server.sendEvent('service.collection', 'add', { value: { rid: 'service.item.15' }, models: { 'service.item.15': { id: 15, name: "Fifteen" }}, idx: 1 });
+				server.sendEvent('service.collection', 'add', { value: { rid: 'service.item.5' }, models: { 'service.item.5': { id: 5, name: "Five" }}, idx: 0 });
 
 				return flushRequests().then(() => {
 					expect(cb.mock.calls.length).toBe(3);
@@ -668,22 +703,33 @@ describe("ResClient", () => {
 		});
 
 		it("emits a remove event on remove", () => {
-			return getServerResource('service.collection', [
-				collectionData[0],
-				{ rid: 'service.item.15', data: { id: 15, name: "Fifteen" }},
-				collectionData[1],
-				{ rid: 'service.item.25', data: { id: 25, name: "Twentyfive" }},
-				collectionData[2]
-			]).then(collection => {
+			return getServerResource('service.collection', {
+				collections: {
+					'service.collection': [
+						collectionData[0],
+						{ rid: 'service.item.15' },
+						collectionData[1],
+						{ rid: 'service.item.25' },
+						collectionData[2]
+					]
+				},
+				models: {
+					'service.item.10': collectionModels['service.item.10'],
+					'service.item.15': { id: 15, name: "Fifteen" },
+					'service.item.20': collectionModels['service.item.20'],
+					'service.item.25': { id: 25, name: "Twentyfive" },
+					'service.item.30': collectionModels['service.item.30']
+				}
+			}).then(collection => {
 				collection.on('remove', cb);
 
 				let model10 = collection.atIndex(0);
 				let model20 = collection.atIndex(2);
 				let model30 = collection.atIndex(4);
 
-				server.sendEvent('service.collection', 'remove', { rid: 'service.item.10', idx: 0 });
-				server.sendEvent('service.collection', 'remove', { rid: 'service.item.20', idx: 1 });
-				server.sendEvent('service.collection', 'remove', { rid: 'service.item.30', idx: 2 });
+				server.sendEvent('service.collection', 'remove', { idx: 0 });
+				server.sendEvent('service.collection', 'remove', { idx: 1 });
+				server.sendEvent('service.collection', 'remove', { idx: 2 });
 
 				return flushRequests().then(() => {
 					expect(cb.mock.calls.length).toBe(3);
@@ -708,11 +754,11 @@ describe("ResClient", () => {
 		});
 
 		it("sets a listened model as stale when removed, subscribing to it after a while", () => {
-			return getServerResource('service.collection', collectionData).then(collection => {
+			return getServerResource('service.collection', collectionResources).then(collection => {
 				let model = collection.atIndex(0);
 				collection.on('remove', cb);
 				model.on('change', cb2);
-				server.sendEvent('service.collection', 'remove', { rid: collectionData[0].rid, idx: 0 });
+				server.sendEvent('service.collection', 'remove', { idx: 0 });
 
 				return flushRequests().then(() => {
 					expect(cb.mock.calls.length).toBe(1);
@@ -727,10 +773,12 @@ describe("ResClient", () => {
 						let req = server.getNextRequest();
 						expect(req).not.toBe(undefined);
 						expect(req.method).toBe('subscribe.' + collectionData[0].rid);
-						server.sendResponse(req, {
-							id: 10,
-							name: "X"
-						});
+						server.sendResponse(req, { models: {
+							'service.item.10': {
+								id: 10,
+								name: "X"
+							}
+						}});
 
 						return flushRequests().then(() => {
 							expect(cb2.mock.calls.length).toBe(1);
@@ -823,7 +871,7 @@ describe("ResClient", () => {
 		});
 
 		it("emits remove and add events when collection differs from cached collection", () => {
-			return getServerResource('service.collection', collectionData).then(collection => {
+			return getServerResource('service.collection', collectionResources).then(collection => {
 				let oldUrl = server.url;
 				collection.on('remove', cb);
 				collection.on('add', cb2);
@@ -910,7 +958,7 @@ describe("ResClient", () => {
 				}
 			});
 
-			return getServerResource('service.collection', collectionData).then(collection => {
+			return getServerResource('service.collection', collectionResources).then(collection => {
 				expect(collection.atIndex(0).flag).toBe(true);
 				expect(collection.atIndex(1).flag).toBe(true);
 				expect(collection.atIndex(1).flag).toBe(true);
@@ -933,7 +981,7 @@ describe("ResClient", () => {
 
 			client.unregisterModelType('service.item');
 
-			return getServerResource('service.collection', collectionData).then(collection => {
+			return getServerResource('service.collection', collectionResources).then(collection => {
 				expect(collection.atIndex(0).flag).toBe(undefined);
 				expect(collection.atIndex(1).flag).toBe(undefined);
 				expect(collection.atIndex(1).flag).toBe(undefined);
@@ -1066,7 +1114,7 @@ describe("ResClient", () => {
 	describe("ResCollection", () => {
 
 		it("calls new method on create", () => {
-			return getServerResource('service.collection', collectionData).then(collection => {
+			return getServerResource('service.collection', collectionResources).then(collection => {
 				collection.create({ foo: "baz" });
 				return flushRequests().then(() => {
 					let req = server.getNextRequest();
@@ -1077,7 +1125,7 @@ describe("ResClient", () => {
 		});
 
 		it("calls remove method on remove", () => {
-			return getServerResource('service.collection', collectionData).then(collection => {
+			return getServerResource('service.collection', collectionResources).then(collection => {
 				collection.remove('service.item.10');
 				return flushRequests().then(() => {
 					let req = server.getNextRequest();
@@ -1088,25 +1136,25 @@ describe("ResClient", () => {
 		});
 
 		it("getResourceId returns the collection resource ID", () => {
-			return getServerResource('service.collection', collectionData).then(collection => {
+			return getServerResource('service.collection', collectionResources).then(collection => {
 				expect(collection.getResourceId()).toBe('service.collection');
 			});
 		});
 
 		it("getResourceId returns the collection resource ID", () => {
-			return getServerResource('service.collection', collectionData).then(collection => {
+			return getServerResource('service.collection', collectionResources).then(collection => {
 				expect(collection.getResourceId()).toBe('service.collection');
 			});
 		});
 
 		it("length gets the collection length", () => {
-			return getServerResource('service.collection', collectionData).then(collection => {
+			return getServerResource('service.collection', collectionResources).then(collection => {
 				expect(collection.length).toBe(3);
 			});
 		});
 
 		it("get returns the model using resource ID without idAttribute set", () => {
-			return getServerResource('service.collection', collectionData).then(collection => {
+			return getServerResource('service.collection', collectionResources).then(collection => {
 				expect(collection.get('service.item.10').toJSON()).toEqual({ id: 10, name: "Ten" });
 				expect(collection.get('service.item.20').toJSON()).toEqual({ id: 20, name: "Twenty" });
 				expect(collection.get('service.item.30').toJSON()).toEqual({ id: 30, name: "Thirty" });
@@ -1114,7 +1162,7 @@ describe("ResClient", () => {
 		});
 
 		it("get returns the model using ID with idAttribute set", () => {
-			return getServerResource('service.collection', collectionData, (api, rid, data) => {
+			return getServerResource('service.collection', collectionResources, (api, rid, data) => {
 				return new ResCollection(api, rid, data, {
 					idAttribute: m => m.id
 				});
@@ -1126,7 +1174,7 @@ describe("ResClient", () => {
 		});
 
 		it("indexOf gets the index of a model using resource ID without idAttribute set", () => {
-			return getServerResource('service.collection', collectionData).then(collection => {
+			return getServerResource('service.collection', collectionResources).then(collection => {
 				expect(collection.indexOf('service.item.10')).toBe(0);
 				expect(collection.indexOf('service.item.20')).toBe(1);
 				expect(collection.indexOf('service.item.30')).toBe(2);
@@ -1134,7 +1182,7 @@ describe("ResClient", () => {
 		});
 
 		it("indexOf gets the index of a model using ID with idAttribute set", () => {
-			return getServerResource('service.collection', collectionData, (api, rid, data) => {
+			return getServerResource('service.collection', collectionResources, (api, rid, data) => {
 				return new ResCollection(api, rid, data, {
 					idAttribute: m => m.id
 				});
@@ -1146,7 +1194,7 @@ describe("ResClient", () => {
 		});
 
 		it("indexOf gets the index of a model", () => {
-			return getServerResource('service.collection', collectionData).then(collection => {
+			return getServerResource('service.collection', collectionResources).then(collection => {
 				let model10 = collection.atIndex(0);
 				let model20 = collection.atIndex(1);
 				let model30 = collection.atIndex(2);
@@ -1157,7 +1205,7 @@ describe("ResClient", () => {
 		});
 
 		it("atIndex returns model at given index", () => {
-			return getServerResource('service.collection', collectionData).then(collection => {
+			return getServerResource('service.collection', collectionResources).then(collection => {
 				expect(collection.atIndex(0).toJSON()).toEqual({ id: 10, name: "Ten" });
 				expect(collection.atIndex(1).toJSON()).toEqual({ id: 20, name: "Twenty" });
 				expect(collection.atIndex(2).toJSON()).toEqual({ id: 30, name: "Thirty" });
@@ -1165,7 +1213,7 @@ describe("ResClient", () => {
 		});
 
 		it("implements iterable", () => {
-			return getServerResource('service.collection', collectionData).then(collection => {
+			return getServerResource('service.collection', collectionResources).then(collection => {
 				let i = 0;
 				for (let model of collection) {
 					expect(model.id).toBe(collectionData[i].data.id);
@@ -1176,7 +1224,7 @@ describe("ResClient", () => {
 		});
 
 		it("creates anonymous array on toJSON", () => {
-			return getServerResource('service.collection', collectionData).then(collection => {
+			return getServerResource('service.collection', collectionResources).then(collection => {
 				expect(collection.toJSON()).toEqual([
 					{ id: 10, name: "Ten" },
 					{ id: 20, name: "Twenty" },

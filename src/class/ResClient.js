@@ -1,21 +1,29 @@
 import CacheItem from './CacheItem';
+import TypeList from './TypeList';
 import ResCollection from './ResCollection';
 import ResModel from './ResModel';
 import eventBus from 'modapp/eventBus';
 import * as obj from 'modapp-utils/obj';
 import { ResError } from './resError';
 
-const defaultModelType = {
-	id: null,
-	modelFactory: function(api, rid, data) {
-		return new ResModel(api, rid, data);
-	}
+const defaultModelFactory = function(api, rid) {
+	return new ResModel(api, rid);
 };
-const defaultCollectionFactory = function(api, rid, data) {
-	return new ResCollection(api, rid, data);
+const defaultCollectionFactory = function(api, rid) {
+	return new ResCollection(api, rid);
 };
-const actionDelete = { action: 'delete' };
+const errorFactory = function(api, rid) {
+	// TODO
+};
 
+// Resource types
+const typeCollection = 'collection';
+const typeModel = 'model';
+const typeError = 'error';
+const resourceTypes = [ typeModel, typeCollection, typeError ];
+// Actions
+const actionDelete = { action: 'delete' };
+// Default settings
 const defaultNamespace = 'resclient';
 const reconnectDelay = 3000;
 const subscribeStaleDelay = 2000;
@@ -47,12 +55,41 @@ class ResClient {
 		this.requests = {};
 		this.reqId = 1; // Incremental request id
 		this.cache = {};
-		this.modelTypes = {};
 		this.stale = null;
 
 		// Queue promises
 		this.connectPromise = null;
 		this.connectCallback = null;
+
+		// Types
+		this.types = {
+			model: {
+				id: typeModel,
+				list: new TypeList(defaultModelFactory),
+				prepareData: dta => dta,
+				getFactory: function(rid) { return this.list.getFactory(rid); },
+				syncronize: this._syncModel.bind(this)
+			},
+			collection: {
+				id: typeCollection,
+				list: new TypeList(defaultCollectionFactory),
+				prepareData: dta => dta.map(v => {
+					// Is the value a reference, get the actual item from cache
+					if (v != null && typeof v === 'object' && v.rid) {
+						let ci = this.cache[v.rid];
+						ci.addIndirect();
+						return ci.item;
+					}
+					return v;
+				}),
+				getFactory: function(rid) { return this.list.getFactory(rid); },
+				syncronize: this._syncCollection.bind(this)
+			},
+			error: {
+				id: typeError,
+				factory: errorFactory
+			}
+		};
 
 		// Bind callbacks
 		this._handleOnopen = this._handleOnopen.bind(this);
@@ -131,50 +168,34 @@ class ResClient {
 	}
 
 	/**
-	 * Model factory callback for the Model Type
-	 * @callback module/Api~modelFactoryCallback
-	 * @param {module/Api} api Api module
-	 * @param {string} rid Resource id of model
-	 * @param {object} data Model data
+	 * Resource factory callback
+	 * @callback ResClient~resourceFactoryCallback
+	 * @param {ResClient} api ResClient instance
+	 * @param {string} rid Resource ID
 	 */
 
 	/**
-	 * Model type definition object
-	 * @typedef {object} module/Api~ModelType
-	 * @property {string} id Id of model type. Should be service name and type name. Eg. 'userService.user'
-	 * @property {module/Api~modelFactoryCallback} modelFactory Model factory callback
+	 * Register a model type.
+	 * The pattern may use the following wild cards:
+	 * * The asterisk (*) matches any part at any level of the resource name.
+	 * * The greater than symbol (>) matches one or more parts at the end of a resource name, and must be the last part.
+	 * @param {string} pattern Pattern of the model type.
+	 * @param {ResClient~resourceFactoryCallback} factory Model factory callback
 	 */
-
-	/**
-	 * Register a model type
-	 * @param {module/Api~ModelType} modelType Model type definition object
-	 */
-	registerModelType(modelType) {
-		if (this.modelTypes[modelType.id]) {
-			throw new Error(`Model type ${modeType.id} already registered`);
-		}
-
-		if (!modelType.id || !modelType.id.match(/^[^.]+\.[^.]+$/)) {
-			throw new Error(`Invalid model type id: ${modelType.id}`);
-		}
-
-		this.modelTypes[modelType.id] = modelType;
+	registerModelType(pattern, factory) {
+		this.types.model.list.addFactory(pattern, factory);
 	}
 
 	/**
-	 * Unregister a model type
-	 * @param {string} modelTypeId Id of model type
-	 * @returns {?object} Model type definition object, or null if it wasn't registered
+	 * Register a collection type.
+	 * The pattern may use the following wild cards:
+	 * * The asterisk (*) matches any part at any level of the resource name.
+	 * * The greater than symbol (>) matches one or more parts at the end of a resource name, and must be the last part.
+	 * @param {string} pattern Pattern of the collection type.
+	 * @param {ResClient~resourceFactoryCallback} factory Collection factory callback
 	 */
-	unregisterModelType(modelTypeId) {
-		let modelType = this.modelTypes[modelTypeId];
-
-		if (!modelType) {
-			return null;
-		}
-
-		delete this.modelTypes[modelTypeId];
-		return modelType;
+	registerCollectionType(pattern, factory) {
+		this.types.collection.list.addFactory(pattern, factory);
 	}
 
 	/**
@@ -183,7 +204,7 @@ class ResClient {
 	 * @param {function} [collectionFactory] Collection factory function.
 	 * @return {Promise.<(ResModel|ResCollection)>} Promise of the resourcce
 	 */
-	getResource(rid, collectionFactory = defaultCollectionFactory) {
+	getResource(rid) {
 		// Check for resource in cache
 		let cacheItem = this.cache[rid];
 		if (cacheItem) {
@@ -195,7 +216,8 @@ class ResClient {
 
 		cacheItem.setPromise(this._send('subscribe.' + rid)
 			.then(response => {
-				return this._getCachedResource(rid, response, false, collectionFactory).item;
+				this._cacheResources(response);
+				return this.cache[rid].item;
 			})
 			.catch(err => {
 				cacheItem.setSubscribed(false);
@@ -374,31 +396,35 @@ class ResClient {
 		}
 
 		let event = data.event.substr(idx + 1);
-
+		let handled = false;
 		switch (event) {
 			case 'change':
-				this._handleChangeEvent(cacheItem, event, data.data);
+				handled = this._handleChangeEvent(cacheItem, event, data.data);
 				break;
 
 			case 'add':
-				this._handleAddEvent(cacheItem, event, data.data);
+				handled = this._handleAddEvent(cacheItem, event, data.data);
 				break;
 
 			case 'remove':
-				this._handleRemoveEvent(cacheItem, event, data.data);
+				handled = this._handleRemoveEvent(cacheItem, event, data.data);
 				break;
 
 			case 'unsubscribe':
-				this._handleUnsubscribeEvent(cacheItem, event);
+				handled = this._handleUnsubscribeEvent(cacheItem, event);
 				break;
+		}
 
-			default:
-				this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + rid + '.' + event, data.data);
-				break;
+		if (!handled) {
+			this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + rid + '.' + event, data.data);
 		}
 	}
 
 	_handleChangeEvent(cacheItem, event, data) {
+		if (cacheItem.type !== typeModel) {
+			return false;
+		}
+
 		// Set deleted properties to undefined
 		let v;
 		for (let key in data) {
@@ -421,41 +447,55 @@ class ResClient {
 				this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + cacheItem.rid + '.' + event, changed);
 			}
 		}
+
+		return true;
 	}
 
 	_handleAddEvent(cacheItem, event, data) {
-		if (!cacheItem.isCollection) {
-			throw new Error("Add event on model");
+		if (cacheItem.type !== typeCollection) {
+			return false;
 		}
 
-		let rid = data.rid;
-		let cacheModel = this._getCachedResource(rid, data.data, true);
-		let idx = cacheItem.item.__add(rid, cacheModel.item, data.idx);
-		this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + cacheItem.rid + '.' + event, { item: cacheModel.item, idx });
+		let v = data.value;
+		let idx = data.idx;
+
+		if (v !== null && typeof v === 'object' && v.rid) {
+			this._cacheResources(data);
+			let ci = this.cache[v.rid];
+			ci.addIndirect();
+			v = ci.item;
+		}
+		cacheItem.item.__add(v, idx);
+		this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + cacheItem.rid + '.' + event, { item: v, idx });
+		return true;
 	}
 
 	_handleRemoveEvent(cacheItem, event, data) {
-		if (!cacheItem.isCollection) {
-			throw new Error("Remove event on model");
+		if (cacheItem.type !== typeCollection) {
+			return false;
 		}
 
 		let idx = data.idx;
 		let item = cacheItem.item.__remove(idx);
 		this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + cacheItem.rid + '.' + event, { item, idx });
 
-		let cacheModel = this.cache[item.getResourceId()];
-		if (!cacheModel) {
-			throw new Error("Removed model is not in cache");
-		}
+		if (item !== null && typeof item === 'object' && typeof item.getResourceId === 'function') {
+			let refItem = this.cache[item.getResourceId()];
+			if (!refItem) {
+				throw new Error("Removed model is not in cache");
+			}
 
-		cacheModel.removeIndirect();
-		this._tryDelete(cacheModel);
+			refItem.removeIndirect();
+			this._tryDelete(refItem);
+		}
+		return true;
 	}
 
 	_handleUnsubscribeEvent(cacheItem, event) {
 		cacheItem.setSubscribed(false);
 		this._tryDelete(cacheItem);
 		this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + cacheItem.rid + '.' + event, { item: cacheItem.item });
+		return true;
 	}
 
 	_setStale(rid) {
@@ -479,99 +519,8 @@ class ResClient {
 
 		cacheItem.setSubscribed(true);
 		this._send('subscribe.' + rid)
-			.then(response => {
-				// Assert the cacheItem hasn't changed
-				if (cacheItem !== this.cache[rid]) {
-					return;
-				}
-
-				this._syncResource(cacheItem, response);
-			})
+			.then(response => this._cacheResources(response))
 			.catch(this._handleFailedSubscribe.bind(this, cacheItem));
-	}
-
-	_patchDiff(a, b, onKeep, onAdd, onRemove) {
-		// Do a LCS matric calculation
-		// https://en.wikipedia.org/wiki/Longest_common_subsequence_problem
-		let t, i, j, s = 0, aa, bb, m = a.length, n = b.length;
-
-		// Trim of matches at the start and end
-		while (s < m && s < n && a[s] === b[s]) {
-			s++;
-		}
-		while (s <= m && s <= n && a[m - 1] === b[n - 1]) {
-			m--;
-			n--;
-		}
-
-		if (s > 0 || m < a.length) {
-			aa = a.slice(s, m);
-			m = aa.length;
-		} else {
-			aa = a;
-		}
-		if (s > 0 || n < b.length) {
-			bb = b.slice(s, n);
-			n = bb.length;
-		} else {
-			bb = b;
-		}
-
-		// Create matrix and initialize it
-		let c = new Array(m + 1);
-		for (i = 0; i <= m; i++) {
-			c[i] = t = new Array(n + 1);
-			t[0] = 0;
-		}
-		t = c[0];
-		for (j = 1; j <= n; j++) {
-			t[j] = 0;
-		}
-
-		for (i = 0; i < m; i++) {
-			for (j = 0; j < n; j++) {
-				c[i + 1][j + 1] = aa[i] === bb[j]
-					? c[i][j] + 1
-					: Math.max(c[i + 1][j], c[i][j + 1]);
-			}
-		}
-
-		for (i = a.length - 1; i >= s + m; i--) {
-			onKeep(a[i], i, i - m + n, i);
-		}
-		let idx = m + s;
-		i = m;
-		j = n;
-		let r = 0;
-		let adds = [];
-		while (true) {
-			m = i - 1;
-			n = j - 1;
-			if (i > 0 && j > 0 && aa[m] === bb[n]) {
-				onKeep(aa[m], m + s, n + s, --idx);
-				i--;
-				j--;
-			} else if (j > 0 && (i === 0 || c[i][n] >= c[m][j])) {
-				adds.push([ n, idx, r ]);
-				j--;
-			} else if (i > 0 && (j === 0 || c[i][n] < c[m][j])) {
-				onRemove(aa[m], m + s, --idx);
-				r++;
-				i--;
-			} else {
-				break;
-			}
-		}
-		for (i = s - 1; i >= 0; i--) {
-			onKeep(a[i], i, i, i);
-		}
-
-		// Do the adds
-		let len = adds.length - 1;
-		for (i = len; i >= 0; i--) {
-			[ n, idx, j ] = adds[i];
-			onAdd(bb[n], n + s, idx - r + j + len - i);
-		}
 	}
 
 	_subscribeToAllStale() {
@@ -698,17 +647,14 @@ class ResClient {
 			return false;
 		}
 
-		if (cacheItem.isCollection) {
-			let item = cacheItem.item, cacheModel;
-			for (let model of item) {
-				let rid = model.getResourceId();
-				cacheModel = this.cache[rid];
-				if (!cacheModel) {
-					throw "Collection model not found in cache";
+		if (cacheItem.type === typeCollection) {
+			let col = cacheItem.item, refItem;
+			for (let v of col) {
+				refItem = this._getRefItem(v);
+				if (refItem) {
+					refItem.removeIndirect();
+					this._tryDelete(refItem);
 				}
-
-				cacheModel.removeIndirect();
-				this._tryDelete(cacheModel);
 			}
 		}
 
@@ -716,85 +662,200 @@ class ResClient {
 		return true;
 	}
 
-	_getCachedResource(rid, data, addIndirect, collectionFactory) {
-		let cacheItem = this.cache[rid];
-		if (cacheItem) {
-			if (cacheItem.item) {
-				// A data object on existing cacheItem indicates
-				// the item is stale and we should update it.
-				if (data) {
-					this._syncResource(cacheItem, data);
-				}
-				if (addIndirect) {
-					cacheItem.addIndirect();
-				}
-
-				return cacheItem;
-			}
-		} else {
-			cacheItem = new CacheItem(rid, this._unsubscribeCacheItem);
-			this.cache[rid] = cacheItem;
-		}
-
-		if (addIndirect) {
-			cacheItem.addIndirect();
-		}
-
-		if (!data) {
-			throw new Error("No data for resource ID " + rid);
-		}
-
-		if (Array.isArray(data)) {
-			let modelConts = data.map(m => {
-				let cacheModel = this._getCachedResource(m.rid, m.data, true);
-				return {
-					rid: m.rid,
-					model: cacheModel.item
-				};
-			});
-
-			cacheItem.setItem(collectionFactory(this, rid, modelConts), true);
-		} else {
-			let modelType = this._getModelType(rid);
-			cacheItem.setItem(modelType.modelFactory(this, rid, data), false)
-				.setType(modelType);
-		}
-
-		return cacheItem;
+	_isResource(v) {
+		return v !== null && typeof v === 'object' && typeof v.getResourceId === 'function';
 	}
 
-	// Syncronizes stale cached item with new data
-	_syncResource(cacheItem, data) {
-		if (cacheItem.isCollection !== Array.isArray(data)) {
-			throw new Error("Resource type inconsistency");
+	_getRefItem(v) {
+		if (!this._isResource(v)) {
+			return null;
+		}
+		let rid = v.getResourceId();
+		let refItem = this.cache[rid];
+		if (!refItem) {
+			throw new Error("Collection resource not found in cache");
+		}
+		return refItem;
+	}
+
+	_cacheResources(resources) {
+		if (!resources) {
+			return;
 		}
 
-		if (cacheItem.isCollection) {
-			let collection = cacheItem.item;
-			let i = collection.length;
-			let a = new Array(i);
-			while (i--) {
-				a[i] = collection.atIndex(i).getResourceId();
-			}
+		let sync = {};
+		resourceTypes.forEach(t => (sync[t] = this._createItems(resources[t + 's'], this.types[t])));
+		resourceTypes.forEach(t => this._initItems(resources[t + 's'], this.types[t]));
+		resourceTypes.forEach(t => this._syncItems(sync[t], this.types[t]));
+	}
 
-			let b = data.map(m => m.rid);
-			this._patchDiff(a, b,
-				(id, m, n, idx) => {
-					if (data[n].data) {
-						this._getCachedResource(id, data[n].data);
-					}
-				},
-				(id, n, idx) => this._handleAddEvent(cacheItem, 'add', {
-					rid: id,
-					data: data[n].data,
-					idx: idx
-				}),
-				(id, m, idx) => this._handleRemoveEvent(cacheItem, 'remove', {
-					rid: id
-				})
-			);
+	_createItems(refs, type) {
+		if (!refs) {
+			return;
+		}
+
+		let sync;
+		for (let rid in refs) {
+			let ci = this.cache[rid];
+			if (!ci) {
+				ci = this.cache[rid] = new CacheItem(
+					rid,
+					this._unsubscribeCacheItem
+				);
+			}
+			// If an item is already set,
+			// it has gone stale and needs to be syncronized.
+			if (ci.item) {
+				if (ci.type !== type.id) {
+					console.error("Resource type inconsistency");
+				} else {
+					sync = sync || {};
+					sync[rid] = refs[rid];
+				}
+				delete refs[rid];
+			} else {
+				let f = type.getFactory(rid);
+				ci.setItem(f(this, rid), type.id);
+			}
+		}
+
+		return sync;
+	}
+
+	_initItems(refs, type) {
+		if (!refs) {
+			return;
+		}
+
+		for (let rid in refs) {
+			let cacheItem = this.cache[rid];
+			cacheItem.item.__init(type.prepareData(refs[rid]));
+		}
+	}
+
+	_syncItems(refs, type) {
+		if (!refs) {
+			return;
+		}
+
+		for (let rid in refs) {
+			let cacheItem = this.cache[rid];
+			type.syncronize(cacheItem, refs[rid]);
+		}
+	}
+
+	_syncModel(cacheItem, data) {
+		this._handleChangeEvent(cacheItem, 'change', data);
+	}
+
+	_syncCollection(cacheItem, data) {
+		let collection = cacheItem.item;
+		let i = collection.length;
+		let a = new Array(i);
+		while (i--) {
+			a[i] = collection.atIndex(i);
+		}
+
+		let b = data.map(v => (
+			v != null && typeof v === 'object' && v.rid
+				// Is the value a reference, get the actual item from cache
+				? this.cache[v.rid]
+				: ci.item
+		));;
+		this._patchDiff(a, b,
+			(id, m, n, idx) => {},
+			(id, n, idx) => this._handleAddEvent(cacheItem, 'add', {
+				rid: id,
+				data: data[n].data,
+				idx: idx
+			}),
+			(id, m, idx) => this._handleRemoveEvent(cacheItem, 'remove', {
+				rid: id
+			})
+		);
+	}
+
+	_patchDiff(a, b, onKeep, onAdd, onRemove) {
+		// Do a LCS matric calculation
+		// https://en.wikipedia.org/wiki/Longest_common_subsequence_problem
+		let t, i, j, s = 0, aa, bb, m = a.length, n = b.length;
+
+		// Trim of matches at the start and end
+		while (s < m && s < n && a[s] === b[s]) {
+			s++;
+		}
+		while (s <= m && s <= n && a[m - 1] === b[n - 1]) {
+			m--;
+			n--;
+		}
+
+		if (s > 0 || m < a.length) {
+			aa = a.slice(s, m);
+			m = aa.length;
 		} else {
-			this._handleChangeEvent(cacheItem, 'change', data);
+			aa = a;
+		}
+		if (s > 0 || n < b.length) {
+			bb = b.slice(s, n);
+			n = bb.length;
+		} else {
+			bb = b;
+		}
+
+		// Create matrix and initialize it
+		let c = new Array(m + 1);
+		for (i = 0; i <= m; i++) {
+			c[i] = t = new Array(n + 1);
+			t[0] = 0;
+		}
+		t = c[0];
+		for (j = 1; j <= n; j++) {
+			t[j] = 0;
+		}
+
+		for (i = 0; i < m; i++) {
+			for (j = 0; j < n; j++) {
+				c[i + 1][j + 1] = aa[i] === bb[j]
+					? c[i][j] + 1
+					: Math.max(c[i + 1][j], c[i][j + 1]);
+			}
+		}
+
+		for (i = a.length - 1; i >= s + m; i--) {
+			onKeep(a[i], i, i - m + n, i);
+		}
+		let idx = m + s;
+		i = m;
+		j = n;
+		let r = 0;
+		let adds = [];
+		while (true) {
+			m = i - 1;
+			n = j - 1;
+			if (i > 0 && j > 0 && aa[m] === bb[n]) {
+				onKeep(aa[m], m + s, n + s, --idx);
+				i--;
+				j--;
+			} else if (j > 0 && (i === 0 || c[i][n] >= c[m][j])) {
+				adds.push([ n, idx, r ]);
+				j--;
+			} else if (i > 0 && (j === 0 || c[i][n] < c[m][j])) {
+				onRemove(aa[m], m + s, --idx);
+				r++;
+				i--;
+			} else {
+				break;
+			}
+		}
+		for (i = s - 1; i >= 0; i--) {
+			onKeep(a[i], i, i, i);
+		}
+
+		// Do the adds
+		let len = adds.length - 1;
+		for (i = len; i >= 0; i--) {
+			[ n, idx, j ] = adds[i];
+			onAdd(bb[n], n + s, idx - r + j + len - i);
 		}
 	}
 
@@ -822,21 +883,17 @@ class ResClient {
 			return;
 		}
 
-		if (cacheItem.isCollection) {
-			let item = cacheItem.item, cacheModel;
-			for (let model of item) {
-				let rid = model.getResourceId();
-				cacheModel = this.cache[rid];
-				if (!cacheModel) {
-					throw new Error("Collection model not found in cache");
-				}
+		if (cacheItem.type === typeCollection) {
+			let col = cacheItem.item, refItem;
+			for (let v of col) {
+				refItem = this._getRefItem(v);
 
-				// Are we missing an existing subscription to the model while having direct references
-				// and this being the last indirect, soon to be removed?
-				if (!cacheModel.subscribed && cacheModel.direct && cacheModel.indirect === 1) {
-					cacheModel.setSubscribed(true);
-					this._send('subscribe.' + rid)
-						.catch(this._handleFailedSubscribe.bind(this, cacheModel));
+				// Are we missing an existing subscription to the model while having
+				// direct references?
+				if (refItem && !refItem.subscribed && refItem.direct) {
+					refItem.setSubscribed(true);
+					this._send('subscribe.' + refItem.rid)
+						.catch(this._handleFailedSubscribe.bind(this, refItem));
 				}
 			}
 		}
@@ -845,21 +902,6 @@ class ResClient {
 	_handleFailedSubscribe(cacheItem, err) {
 		cacheItem.setSubscribed(false);
 		this._tryDelete(cacheItem);
-	}
-
-	_getModelType(resourceName) {
-		let l = resourceName.length, n = 2, i = -1;
-		while (n-- && i++ < l){
-			i = resourceName.indexOf('.', i);
-			if (i < 0) {
-				i = resourceName.length;
-				break;
-			}
-		}
-
-		let typeName = resourceName.substr(0, i);
-
-		return this.modelTypes[typeName] || defaultModelType;
 	}
 
 	_reconnect() {
