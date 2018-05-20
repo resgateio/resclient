@@ -1,4 +1,3 @@
-import SortedMap from 'modapp-resource/SortedMap';
 import * as obj from 'modapp-utils/obj';
 
 /**
@@ -11,33 +10,20 @@ class ResCollection {
 	 * Creates an ResCollection instance
 	 * @param {ResClient} api ResClient instance
 	 * @param {string} rid Resource id.
-	 * @param {Array.<object>} data ResCollection data array
 	 * @param {object} [opt] Optional settings
-	 * @param {function} [opt.compare] Compare function for sort order. Defaults to insert order.
-	 * @param {function} [opt.idAttribute] Id attribute callback function. Defaults to returning the object.id property.
+	 * @param {function} [opt.idCallback] Id callback function.
 	 */
-	constructor(api, rid, data, opt) {
+	constructor(api, rid, opt) {
 		opt = obj.copy(opt, {
-			compare: { type: '?function' },
-			idAttribute: { type: '?function' }
+			idCallback: { type: '?function' }
 		});
 
-		this._rid = rid;
 		this._api = api;
-		this._idAttribute = opt.idAttribute;
+		this._rid = rid;
+		this._idCallback = opt.idCallback;
 
-		this._modelResources = this._idAttribute ? {} : null;
-		this._map = new SortedMap(opt.compare);
-
-		// Populate map with initial data
-		if (data) {
-			for (let cont of data) {
-				this._map.add(cont.rid, cont.model);
-				if (this._idAttribute) {
-					this._modelResources[this._idAttribute(cont.model)] = cont.rid;
-				}
-			}
-		}
+		this._map = this._idCallback ? {} : null;
+		this._list = null;
 	}
 
 	/**
@@ -52,7 +38,7 @@ class ResCollection {
 	 * Length of the collection
 	 */
 	get length() {
-		return this._map.length;
+		return this._list.length;
 	}
 
 	/**
@@ -82,35 +68,34 @@ class ResCollection {
 	}
 
 	/**
-	 * Get a model from the collection by id
-	 * @param {string} id Id of the model
-	 * @returns {*} Stored model. Undefined if key doesn't exist
+	 * Get an item from the collection by id.
+	 * Requires that id callback is defined for the collection.
+	 * @param {string} id Id of the item
+	 * @returns {*} Item with the id. Undefined if key doesn't exist
 	 */
 	get(id) {
-		let rid = this._idAttribute ? this._modelResources[id] : id;
-		return this._map.get(rid);
-	}
-
-	/**
-	 * Retrieves the order index of a model.
-	 * @param {string|Model} id Id of the model or the model object
-	 * @returns {number} Order index of the model. -1 if the model id doesn't exist.
-	 */
-	indexOf(id) {
-		if (id && typeof id !== 'object') {
-			let rid = this._idAttribute ? this._modelResources[id] : id;
-			id = rid ? this._map.get(rid) : null;
+		if (!this._idCallback) {
+			throw new Error("No id callback defined");
 		}
-		return id ? this._map.indexOf(id) : -1;
+		return this._map[id];
 	}
 
 	/**
-	 * Gets a model from the collection by index position
-	 * @param {number} idx  Index of the model
-	 * @returns {module:modapp~Model} Stored model. Undefined if the index is out of bounds.
+	 * Retrieves the order index of an item.
+	 * @param {*} item Item to find
+	 * @returns {number} Order index of the first matching item. -1 if the item doesn't exist.
+	 */
+	indexOf(item) {
+		return this._list.indexOf(id);
+	}
+
+	/**
+	 * Gets an item from the collection by index position
+	 * @param {number} idx  Index of the item
+	 * @returns {*} Item at the given index. Undefined if the index is out of bounds.
 	 */
 	atIndex(idx) {
-		return this._map[idx];
+		return this._list[idx];
 	}
 
 	/**
@@ -134,60 +119,82 @@ class ResCollection {
 	}
 
 	/**
-	 * Add a model to the collection.
-	 * Should only be called from api module.
-	 * @param {string} modelId Model resource id
-	 * @param {object} model Model object
-	 * @param {idx} [idx] Index value of where to insert the model. Ignored if the collection has a compare function.
-	 * @returns {number} Index value of where the model was inserted in the list
+	 * Returns a shallow clone of the internal array.
+	 * @returns {Array.<*>} Clone of internal array
+	 */
+	toArray() {
+		return this._list.slice();
+	}
+
+	/**
+	 * Initializes the collection with a data array.
+	 * Should only be called by the ResClient instance.
+	 * @param {Array.<*>} data ResCollection data array
 	 * @private
 	 */
-	__add(modelId, model, idx) {
-		idx = this._map.add(modelId, model, idx);
+	__init(data) {
+		this._list = data || [];
 
-		if (this._idAttribute) {
-			this._modelResources[this._idAttribute(model)] = modelId;
+		if (this._idCallback) {
+			this._map = {};
+			this._list.forEach(v => {
+				let id = String(this._idCallback(v));
+				if (this._map[id]) {
+					throw new Error("Duplicate id - " + id);
+				}
+				this._map[id] = v;
+			});
 		}
-		return idx;
+	}
+
+	/**
+	 * Add a model to the collection.
+	 * Should only be called by the ResClient instance.
+	 * @param {object} item Item
+	 * @param {idx} [idx] Index value of where to insert the item.
+	 * @private
+	 */
+	__add(item, idx) {
+		this._list.splice(idx, 0, item);
+
+		if (this._idCallback) {
+			let id = String(this._idCallback(v));
+			if (this._map[id]) {
+				throw new Error("Duplicate id - " + id);
+			}
+			this._map[id] = v;
+		}
 	}
 
 	/**
 	 * Remove a model from the collection.
-	 * Should only be called from api module.
+	 * Should only be called by the ResClient instance.
 	 * @param {number} idx Index of the item to remove
 	 * @returns {*} Removed item or undefined if no item was removed
 	 * @private
 	 */
 	__remove(idx) {
-		let model = this._map[idx];
-		if (model === undefined) {
-			return model;
+		let item = this._list[idx];
+		this._list.splice(idx, 1);
+
+		if (this._idCallback) {
+			delete this._map[this._idCallback(item)];
 		}
 
-		this._map.remove(model.getResourceId());
-
-		if (this._idAttribute) {
-			delete this._modelResources[this._idAttribute(model)];
-		}
-
-		return model;
+		return item;
 	}
 
 	toJSON() {
-		let m;
-		let len = this._map.length;
-		let arr = new Array(len);
-		for (let i = 0; i < len; i++) {
-			m = this._map[i];
-			arr[i] = m.toJSON ? m.toJSON() : m;
-		}
-
-		return arr;
+		return this._list.map(v => (
+			v !== null && typeof v === 'object' && v.toJSON
+				? v.toJSON()
+				: v
+		));
 	}
 
 	[Symbol.iterator]() {
 		let i = 0,
-			a = this._map,
+			a = this._list,
 			l = a.length;
 
 		return {

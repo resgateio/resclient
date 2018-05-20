@@ -10,19 +10,16 @@ class ResModel {
 	 * Creates a ResModel instance
 	 * @param {ResClient} api ResClient instance
 	 * @param {string} rid Resource id.
-	 * @param {object} data Data object
 	 * @param {object} [opt] Optional parameters.
 	 * @param {object} [opt.definition] Object definition. If not provided, any value will be allowed.
 	 */
-	constructor(api, rid, data, opt) {
+	constructor(api, rid, opt) {
 		obj.update(this, opt, {
 			definition: { type: '?object', property: '_definition' }
 		});
 
 		this._rid = rid;
 		this._api = api;
-
-		this.__update(data);
 	}
 
 	/**
@@ -79,8 +76,18 @@ class ResModel {
 	}
 
 	/**
+	 * Initializes the model with a data object.
+	 * Should only be called by the ResClient instance.
+	 * @param {object} data Data object
+	 * @private
+	 */
+	__init(data) {
+		this.__update(data);
+	}
+
+	/**
 	 * Updates the model.
-	 * Should only be called by the resClient instance.
+	 * Should only be called by the ResClient instance.
 	 * @param {object} props Properties to update
 	 * @returns {?object} Changed properties
 	 * @private
