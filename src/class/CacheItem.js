@@ -11,12 +11,14 @@ class CacheItem {
 		this.rid = rid;
 		this._unsubscribe = unsubcribeCallback;
 
+		this.type = null;
 		this.item = null;
 		this.direct = 0;
 		this.indirect = 0;
-		this.isCollection = false;
 		this.subscribed = false;
 		this.promise = null;
+
+		this._checkUnsubscribe();
 	}
 
 	setSubscribed(isSubscribed) {
@@ -35,11 +37,13 @@ class CacheItem {
 		return this;
 	}
 
-	setItem(item, isCollection) {
+	setItem(item, type) {
 		this.item = item;
-		this.isCollection = isCollection;
+		this.type = type;
 		this.promise = null;
-		this._checkUnsubscribe();
+		if (this.subscribed) {
+			this._checkUnsubscribe();
+		}
 		return this;
 	}
 
