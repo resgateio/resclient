@@ -94,16 +94,6 @@ class CacheItem {
 		this._checkUnsubscribe();
 	}
 
-	// Checks if the cachedItem can be deleted.
-	// It returns true if there are no direct listeners, no indirect references, and it is not subscribed
-	// If it returns true, unsubTimeout is cleared
-	canDelete() {
-		if (this.direct || this.indirect || this.subscribed) {
-			return false;
-		}
-		clearTimeout(this.unsubTimeout);
-		return true;
-	}
 }
 
 export default CacheItem;
