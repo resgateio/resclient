@@ -759,7 +759,7 @@ class ResClient {
 		let b = data.map(v => (
 			v != null && typeof v === 'object' && v.rid
 				// Is the value a reference, get the actual item from cache
-				? this.cache[v.rid]
+				? this.cache[v.rid].item
 				: ci.item
 		));;
 		this._patchDiff(a, b,
