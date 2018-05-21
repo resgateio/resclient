@@ -317,7 +317,7 @@ describe("ResClient", () => {
 
 		it("gets collection model from cache if already loaded", () => {
 			let rid = collectionData[0].rid;
-			models = {};
+			let models = {};
 			models[rid] = collectionModels[rid];
 			return getServerResource(rid, { models }).then(model => {
 				models = Object.assign({}, collectionModels);
@@ -592,6 +592,40 @@ describe("ResClient", () => {
 			});
 		});
 
+		it("unsubscribes to collection after it is no longer listened to", () => {
+			return getServerResource('service.collection', collectionResources).then(collection => {
+				collection.on('add', cb);
+				collection.on('remove', cb2);
+
+				return waitAWhile().then(flushRequests).then(() => {
+					collection.off('add', cb);
+
+					return waitAWhile().then(flushRequests).then(() => {
+						expect(server.pendingRequests()).toBe(0);
+						collection.off('remove', cb2);
+
+						return waitAWhile().then(flushRequests).then(() => {
+							expect(server.error).toBe(null);
+							let req = server.getNextRequest();
+							expect(req).not.toBe(undefined);
+							expect(req.method).toBe('unsubscribe.service.collection');
+							server.sendResponse(req, null);
+
+							// Wait for the unsubscribe response
+							return flushRequests().then(() => {
+								expect(server.error).toBe(null);
+
+								return getServerResource('service.collection', collectionResources).then(collectionSecond => {
+									expect(collection).not.toBe(collectionSecond);
+									expect(server.pendingRequests()).toBe(0);
+								});
+							});
+						});
+					});
+				});
+			});
+		});
+
 		it("subscribes to listened models before unsubscribing to the collection", () => {
 			return getServerResource('service.collection', collectionResources).then(collection => {
 				let model = collection.atIndex(0);
@@ -816,7 +850,7 @@ describe("ResClient", () => {
 		});
 
 		it("resubscribes to a model after reconnect", () => {
-			return getServerResource('service.model', modelData).then(model => {
+			return getServerResource('service.model', modelResources).then(model => {
 				model.on('change', cb);
 				let oldUrl = server.url;
 				server.close();
@@ -829,7 +863,7 @@ describe("ResClient", () => {
 						let req = server.getNextRequest();
 						expect(req).not.toBe(undefined);
 						expect(req.method).toBe('subscribe.service.model');
-						server.sendResponse(req, modelData);
+						server.sendResponse(req, modelResources);
 
 						return flushRequests().then(() => {
 							expect(server.error).toBe(null);
@@ -841,7 +875,7 @@ describe("ResClient", () => {
 		});
 
 		it("emits a change event when resubscribed model differs from cached model", () => {
-			return getServerResource('service.model', modelData).then(model => {
+			return getServerResource('service.model', modelResources).then(model => {
 				model.on('change', cb);
 				let oldUrl = server.url;
 				server.close();
@@ -851,10 +885,12 @@ describe("ResClient", () => {
 
 					return waitAWhile().then(flushRequests).then(() => {
 						let req = server.getNextRequest();
-						server.sendResponse(req, {
-							foo: "baz",
-							int: 42
-						});
+						server.sendResponse(req, { models: {
+							'service.model': {
+								foo: "baz",
+								int: 42
+							}
+						}});
 
 						return flushRequests().then(() => {
 							expect(cb.mock.calls.length).toBe(1);
@@ -882,11 +918,18 @@ describe("ResClient", () => {
 
 					return waitAWhile().then(flushRequests).then(() => {
 						let req = server.getNextRequest();
-						server.sendResponse(req, [
-							collectionData[0],
-							{ rid: 'service.item.15', data: { id: 15, name: "Fifteen" }},
-							collectionData[2]
-						]);
+						server.sendResponse(req, {
+							models: {
+								'service.item.15': { id: 15, name: "Fifteen" }
+							},
+							collections: {
+								'service.collection': [
+									collectionData[0],
+									{ rid: 'service.item.15' },
+									collectionData[2]
+								]
+							}
+						});
 
 						return flushRequests().then(() => {
 							expect(collection.length).toBe(3);
@@ -945,10 +988,10 @@ describe("ResClient", () => {
 	describe("modelType", () => {
 
 		it("uses the registered model type when creating a model instance", () => {
-			client.registerModelType({
-				id: 'service.item',
-				modelFactory: (api, rid, data) => {
-					return new ResModel(api, rid, data, {
+			client.registerModelType(
+				'service.item.*',
+				(api, rid, data) => {
+					return new ResModel(api, rid, {
 						definition: {
 							id: { type: 'number' },
 							name: { type: 'string' },
@@ -956,7 +999,7 @@ describe("ResClient", () => {
 						}
 					});
 				}
-			});
+			);
 
 			return getServerResource('service.collection', collectionResources).then(collection => {
 				expect(collection.atIndex(0).flag).toBe(true);
@@ -965,45 +1008,41 @@ describe("ResClient", () => {
 			});
 		});
 
-		it("does not use an unregistered model type when creating a model instance", () => {
-			client.registerModelType({
-				id: 'service.item',
-				modelFactory: (api, rid, data) => {
-					return new ResModel(api, rid, data, {
-						definition: {
-							id: { type: 'number' },
-							name: { type: 'string' },
-							flag: { type: 'boolean', default: true }
-						}
-					});
-				}
-			});
+		// it("does not use an unregistered model type when creating a model instance", () => {
+		// 	client.registerModelType(
+		// 		'service.item.*',
+		// 		(api, rid, data) => {
+		// 			return new ResModel(api, rid, {
+		// 				definition: {
+		// 					id: { type: 'number' },
+		// 					name: { type: 'string' },
+		// 					flag: { type: 'boolean', default: true }
+		// 				}
+		// 			});
+		// 		}
+		// 	);
 
-			client.unregisterModelType('service.item');
+		// 	client.unregisterModelType('service.item');
+
+		// 	return getServerResource('service.collection', collectionResources).then(collection => {
+		// 		expect(collection.atIndex(0).flag).toBe(undefined);
+		// 		expect(collection.atIndex(1).flag).toBe(undefined);
+		// 		expect(collection.atIndex(1).flag).toBe(undefined);
+		// 	});
+		// });
+
+		it("uses the registered collection type when creating a collection instance", () => {
+			client.registerCollectionType(
+				'service.collection',
+				(api, rid) => {
+					let c = new ResCollection(api, rid);
+					c.flag = true;
+					return c;
+				}
+			);
 
 			return getServerResource('service.collection', collectionResources).then(collection => {
-				expect(collection.atIndex(0).flag).toBe(undefined);
-				expect(collection.atIndex(1).flag).toBe(undefined);
-				expect(collection.atIndex(1).flag).toBe(undefined);
-			});
-		});
-
-		it("creates a collecting using collectionFactory callback function", () => {
-			let promise = client.getResource('service.collection', (api, rid, data) => {
-				let c = new ResCollection(api, rid, data);
-				c.flag = true;
-				return c;
-			}).then(collection => {
 				expect(collection.flag).toBe(true);
-			});
-
-			return flushRequests().then(() => {
-				let req = server.getNextRequest();
-				expect(req).not.toBe(undefined);
-				expect(req.method).toBe('subscribe.service.collection');
-				server.sendResponse(req, collectionData);
-
-				return flushRequests().then(() => promise);
 			});
 		});
 	});
@@ -1011,7 +1050,7 @@ describe("ResClient", () => {
 	describe("ResModel", () => {
 
 		it("calls remote method on call with parameters", () => {
-			return getServerResource('service.model', modelData).then(model => {
+			return getServerResource('service.model', modelResources).then(model => {
 				model.call('test', { zoo: "baz", value: 12 });
 
 				return flushRequests().then(() => {
@@ -1025,7 +1064,7 @@ describe("ResClient", () => {
 		});
 
 		it("calls remote method on call without parameters", () => {
-			return getServerResource('service.model', modelData).then(model => {
+			return getServerResource('service.model', modelResources).then(model => {
 				model.call('test');
 				return flushRequests().then(() => {
 					let req = server.getNextRequest();
@@ -1035,7 +1074,7 @@ describe("ResClient", () => {
 		});
 
 		it("calls set method on set", () => {
-			return getServerResource('service.model', modelData).then(model => {
+			return getServerResource('service.model', modelResources).then(model => {
 				model.set({ foo: "baz" });
 				return flushRequests().then(() => {
 					let req = server.getNextRequest();
@@ -1046,7 +1085,7 @@ describe("ResClient", () => {
 		});
 
 		it("resolves call promise on success", () => {
-			return getServerResource('service.model', modelData).then(model => {
+			return getServerResource('service.model', modelResources).then(model => {
 				let promise = model.call('test');
 
 				return flushRequests().then(() => {
@@ -1061,7 +1100,7 @@ describe("ResClient", () => {
 		});
 
 		it("rejects call promise on error", () => {
-			return getServerResource('service.model', modelData).then(model => {
+			return getServerResource('service.model', modelResources).then(model => {
 				let promise = model.call('test');
 
 				return flushRequests().then(() => {
@@ -1078,16 +1117,16 @@ describe("ResClient", () => {
 		});
 
 		it("creates anonymous object on toJSON", () => {
-			return getServerResource('service.model', { foo: "bar", value: 10 }).then(model => {
-				expect(model.toJSON()).toEqual({ foo: "bar", value: 10 });
+			return getServerResource('service.model', modelResources).then(model => {
+				expect(model.toJSON()).toEqual(modelData);
 			});
 		});
 
 		it("creates anonymous object on toJSON using definition", () => {
-			client.registerModelType({
-				id: 'service.model',
-				modelFactory: (api, rid, data) => {
-					return new ResModel(api, rid, data, {
+			client.registerModelType(
+				'service.model',
+				(api, rid) => {
+					return new ResModel(api, rid, {
 						definition: {
 							foo: { type: 'string' },
 							value: { type: 'number', default: 10 },
@@ -1095,13 +1134,15 @@ describe("ResClient", () => {
 						}
 					});
 				}
-			});
+			);
 
-			return getServerResource('service.model', {
-				foo: "bar",
-				value: 12,
-				notDefined: "Not defined"
-			}).then(model => {
+			return getServerResource('service.model', { models: {
+				'service.model': {
+					foo: "bar",
+					value: 12,
+					notDefined: "Not defined"
+				}
+			}}).then(model => {
 				expect(model.toJSON()).toEqual({
 					foo: "bar",
 					value: 12,
@@ -1153,58 +1194,22 @@ describe("ResClient", () => {
 			});
 		});
 
-		it("get returns the model using resource ID without idAttribute set", () => {
-			return getServerResource('service.collection', collectionResources).then(collection => {
-				expect(collection.get('service.item.10').toJSON()).toEqual({ id: 10, name: "Ten" });
-				expect(collection.get('service.item.20').toJSON()).toEqual({ id: 20, name: "Twenty" });
-				expect(collection.get('service.item.30').toJSON()).toEqual({ id: 30, name: "Thirty" });
-			});
-		});
-
 		it("get returns the model using ID with idAttribute set", () => {
-			return getServerResource('service.collection', collectionResources, (api, rid, data) => {
-				return new ResCollection(api, rid, data, {
-					idAttribute: m => m.id
-				});
-			}).then(collection => {
+			client.registerCollectionType(
+				'service.collection',
+				(api, rid) => new ResCollection(api, rid, {
+					idCallback: m => m.id
+				})
+			);
+
+			return getServerResource('service.collection', collectionResources).then(collection => {
 				expect(collection.get(10).toJSON()).toEqual({ id: 10, name: "Ten" });
 				expect(collection.get(20).toJSON()).toEqual({ id: 20, name: "Twenty" });
 				expect(collection.get(30).toJSON()).toEqual({ id: 30, name: "Thirty" });
 			});
 		});
 
-		it("indexOf gets the index of a model using resource ID without idAttribute set", () => {
-			return getServerResource('service.collection', collectionResources).then(collection => {
-				expect(collection.indexOf('service.item.10')).toBe(0);
-				expect(collection.indexOf('service.item.20')).toBe(1);
-				expect(collection.indexOf('service.item.30')).toBe(2);
-			});
-		});
-
-		it("indexOf gets the index of a model using ID with idAttribute set", () => {
-			return getServerResource('service.collection', collectionResources, (api, rid, data) => {
-				return new ResCollection(api, rid, data, {
-					idAttribute: m => m.id
-				});
-			}).then(collection => {
-				expect(collection.indexOf(10)).toBe(0);
-				expect(collection.indexOf(20)).toBe(1);
-				expect(collection.indexOf(30)).toBe(2);
-			});
-		});
-
-		it("indexOf gets the index of a model", () => {
-			return getServerResource('service.collection', collectionResources).then(collection => {
-				let model10 = collection.atIndex(0);
-				let model20 = collection.atIndex(1);
-				let model30 = collection.atIndex(2);
-				expect(collection.indexOf(model10)).toBe(0);
-				expect(collection.indexOf(model20)).toBe(1);
-				expect(collection.indexOf(model30)).toBe(2);
-			});
-		});
-
-		it("atIndex returns model at given index", () => {
+		it("atIndex gets the item at a given index", () => {
 			return getServerResource('service.collection', collectionResources).then(collection => {
 				expect(collection.atIndex(0).toJSON()).toEqual({ id: 10, name: "Ten" });
 				expect(collection.atIndex(1).toJSON()).toEqual({ id: 20, name: "Twenty" });
@@ -1212,12 +1217,38 @@ describe("ResClient", () => {
 			});
 		});
 
+		it("indexOf gets the index of a primitive item", () => {
+			return getServerResource('service.collection', { collections: {
+				'service.collection': [
+					"Foo",
+					"Bar",
+					"Baz",
+					"Bar"
+				]
+			}}).then(collection => {
+				expect(collection.indexOf("Foo")).toBe(0);
+				expect(collection.indexOf("Bar")).toBe(1);
+				expect(collection.indexOf("Baz")).toBe(2);
+				expect(collection.indexOf("Faz")).toBe(-1);
+			});
+		});
+
+		it("indexOf gets the index of a model item", () => {
+			return getServerResource('service.collection', collectionResources).then(collection => {
+				expect(collection.indexOf(collection.atIndex(0))).toBe(0);
+				expect(collection.indexOf(collection.atIndex(1))).toBe(1);
+				expect(collection.indexOf(collection.atIndex(2))).toBe(2);
+				expect(collection.indexOf({})).toBe(-1);
+			});
+		});
+
 		it("implements iterable", () => {
 			return getServerResource('service.collection', collectionResources).then(collection => {
 				let i = 0;
 				for (let model of collection) {
-					expect(model.id).toBe(collectionData[i].data.id);
-					expect(model.name).toBe(collectionData[i].data.name);
+					let expModel = collectionModels[collectionData[i].rid];
+					expect(model.id).toBe(expModel.id);
+					expect(model.name).toBe(expModel.name);
 					i++;
 				}
 			});

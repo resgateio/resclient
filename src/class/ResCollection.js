@@ -45,7 +45,7 @@ class ResCollection {
 	 * Attach a collection event handler function for one or more events.
 	 * If no event or handler is provided, the collection will still be considered listened to,
 	 * until a matching off call without arguments is made.
-	 * Available events are 'add', 'remove', and 'move'.
+	 * Available events are 'add' and 'remove'.
 	 * @param {?string} [events] One or more space-separated events. Null means any event.
 	 * @param {eventCallback} [handler] Handler function to execute when the event is emitted.
 	 * @returns {this}
@@ -57,7 +57,7 @@ class ResCollection {
 
 	 /**
 	 * Remove a collection event handler function.
-	 * Available events are 'add', 'remove', and 'move'.
+	 * Available events are 'add' and 'remove'.
 	 * @param {?string} [events] One or more space-separated events. Null means any event.
 	 * @param {eventCallback} [handler] Handler function to remove.
 	 * @returns {this}
@@ -86,7 +86,7 @@ class ResCollection {
 	 * @returns {number} Order index of the first matching item. -1 if the item doesn't exist.
 	 */
 	indexOf(item) {
-		return this._list.indexOf(id);
+		return this._list.indexOf(item);
 	}
 
 	/**
@@ -100,7 +100,7 @@ class ResCollection {
 
 	/**
 	 * Creates a new model for the collection at the server.
-	 * Server will return an error if the collection doesn't support creation.
+	 * Server will return an error if the collection doesn't support model creation.
 	 * @param {object} props Model properties
 	 * @returns {Promise.<Model>} Promise of the created model.
 	 */
@@ -148,9 +148,9 @@ class ResCollection {
 	}
 
 	/**
-	 * Add a model to the collection.
+	 * Add an item to the collection.
 	 * Should only be called by the ResClient instance.
-	 * @param {object} item Item
+	 * @param {*} item Item
 	 * @param {idx} [idx] Index value of where to insert the item.
 	 * @private
 	 */
@@ -158,16 +158,16 @@ class ResCollection {
 		this._list.splice(idx, 0, item);
 
 		if (this._idCallback) {
-			let id = String(this._idCallback(v));
+			let id = String(this._idCallback(item));
 			if (this._map[id]) {
 				throw new Error("Duplicate id - " + id);
 			}
-			this._map[id] = v;
+			this._map[id] = item;
 		}
 	}
 
 	/**
-	 * Remove a model from the collection.
+	 * Remove an item from the collection.
 	 * Should only be called by the ResClient instance.
 	 * @param {number} idx Index of the item to remove
 	 * @returns {*} Removed item or undefined if no item was removed
