@@ -926,17 +926,25 @@ describe("ResClient", () => {
 								'service.collection': [
 									collectionData[0],
 									{ rid: 'service.item.15' },
-									collectionData[2]
+									collectionData[2],
+									"foo"
 								]
 							}
 						});
 
 						return flushRequests().then(() => {
-							expect(collection.length).toBe(3);
+							expect(collection.length).toBe(4);
 							expect(cb.mock.calls.length).toBe(1);
 							expect(cb.mock.calls[0][1]).toBe(collection);
-							expect(cb2.mock.calls.length).toBe(1);
+							expect(cb.mock.calls[0][0].item.getResourceId()).toBe('service.item.20');
+							expect(cb.mock.calls[0][0].idx).toEqual(1);
+							expect(cb2.mock.calls.length).toBe(2);
 							expect(cb2.mock.calls[0][1]).toBe(collection);
+							expect(cb2.mock.calls[0][0].item.getResourceId()).toBe('service.item.15');
+							expect(cb2.mock.calls[0][0].idx).toEqual(1);
+							expect(cb2.mock.calls[1][1]).toBe(collection);
+							expect(cb2.mock.calls[1][0].item).toEqual("foo");
+							expect(cb2.mock.calls[1][0].idx).toEqual(3);
 
 							expect(server.error).toBe(null);
 							expect(server.pendingRequests()).toBe(0);
