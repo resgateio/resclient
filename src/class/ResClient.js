@@ -459,6 +459,7 @@ class ResClient {
 		let v = data.value;
 		let idx = data.idx;
 
+		// Get resource if value is a resource reference
 		if (v !== null && typeof v === 'object' && v.rid) {
 			this._cacheResources(data);
 			let ci = this.cache[v.rid];
@@ -760,18 +761,15 @@ class ResClient {
 			v != null && typeof v === 'object' && v.rid
 				// Is the value a reference, get the actual item from cache
 				? this.cache[v.rid].item
-				: ci.item
+				: v
 		));;
 		this._patchDiff(a, b,
 			(id, m, n, idx) => {},
 			(id, n, idx) => this._handleAddEvent(cacheItem, 'add', {
-				rid: id,
-				data: data[n].data,
+				value: data[n],
 				idx: idx
 			}),
-			(id, m, idx) => this._handleRemoveEvent(cacheItem, 'remove', {
-				rid: id
-			})
+			(id, m, idx) => this._handleRemoveEvent(cacheItem, 'remove', { idx })
 		);
 	}
 
