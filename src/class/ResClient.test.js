@@ -104,6 +104,18 @@ describe("ResClient", () => {
 			'service.collection': collectionData
 		}
 	};
+	const primitiveCollectionData = [
+		"foo",
+		42,
+		true,
+		false,
+		null
+	];
+	const primitiveCollectionResources = {
+		collections: {
+			'service.primitives': primitiveCollectionData
+		}
+	};
 
 	function flushPromises(depth = 2) {
 		return new Promise(resolve => setImmediate(() => {
@@ -275,7 +287,30 @@ describe("ResClient", () => {
 
 	describe("getResource collection", () => {
 
-		it("gets collection resource from server", () => {
+		it("gets primitive collection resource from server", () => {
+			let promise = client.getResource('service.primitives').then(collection => {
+				expect(server.error).toBe(null);
+				expect(server.pendingRequests()).toBe(0);
+
+				expect(collection.length).toBe(primitiveCollectionData.length);
+				expect(collection.atIndex(0)).toBe("foo");
+				expect(collection.atIndex(1)).toBe(42);
+				expect(collection.atIndex(2)).toBe(true);
+				expect(collection.atIndex(3)).toBe(false);
+				expect(collection.atIndex(4)).toBe(null);
+			});
+
+			return flushRequests().then(() => {
+				let req = server.getNextRequest();
+				expect(req).not.toBe(undefined);
+				expect(req.method).toBe('subscribe.service.primitives');
+				server.sendResponse(req, primitiveCollectionResources);
+
+				return flushRequests().then(() => promise);
+			});
+		});
+
+		it("gets model collection resource from server", () => {
 			let promise = client.getResource('service.collection').then(collection => {
 				expect(server.error).toBe(null);
 				expect(server.pendingRequests()).toBe(0);
@@ -296,7 +331,7 @@ describe("ResClient", () => {
 			});
 		});
 
-		it("gets collection resource and collection models from cache on second request", () => {
+		it("gets model collection resource and collection models from cache on second request", () => {
 			return getServerResource('service.collection', collectionResources).then(collection => {
 				expect(collection.atIndex(0).name).toBe("Ten");
 				return client.getResource('service.collection').then(collectionSecond => {
@@ -702,7 +737,7 @@ describe("ResClient", () => {
 			});
 		});
 
-		it("emits an add event on add", () => {
+		it("emits an add event on model add", () => {
 			return getServerResource('service.collection', collectionResources).then(collection => {
 				collection.on('add', cb);
 
@@ -712,17 +747,14 @@ describe("ResClient", () => {
 
 				return flushRequests().then(() => {
 					expect(cb.mock.calls.length).toBe(3);
-					expect(collection.length).toBe(6);
-
 					expect(cb.mock.calls[0][0]).toEqual({ idx: 3, item: collection.atIndex(5) });
 					expect(cb.mock.calls[0][1]).toBe(collection);
-
 					expect(cb.mock.calls[1][0]).toEqual({ idx: 1, item: collection.atIndex(2) });
 					expect(cb.mock.calls[1][1]).toBe(collection);
-
 					expect(cb.mock.calls[2][0]).toEqual({ idx: 0, item: collection.atIndex(0) });
 					expect(cb.mock.calls[2][1]).toBe(collection);
 
+					expect(collection.length).toBe(6);
 					expect(collection.atIndex(0).name).toBe("Five");
 					expect(collection.atIndex(1).name).toBe("Ten");
 					expect(collection.atIndex(2).name).toBe("Fifteen");
@@ -736,7 +768,7 @@ describe("ResClient", () => {
 			});
 		});
 
-		it("emits a remove event on remove", () => {
+		it("emits a remove event on model remove", () => {
 			return getServerResource('service.collection', {
 				collections: {
 					'service.collection': [
@@ -767,19 +799,80 @@ describe("ResClient", () => {
 
 				return flushRequests().then(() => {
 					expect(cb.mock.calls.length).toBe(3);
-					expect(collection.length).toBe(2);
-
 					expect(cb.mock.calls[0][0]).toEqual({ idx: 0, item: model10 });
 					expect(cb.mock.calls[0][1]).toBe(collection);
-
 					expect(cb.mock.calls[1][0]).toEqual({ idx: 1, item: model20 });
 					expect(cb.mock.calls[1][1]).toBe(collection);
-
 					expect(cb.mock.calls[2][0]).toEqual({ idx: 2, item: model30 });
 					expect(cb.mock.calls[2][1]).toBe(collection);
 
+					expect(collection.length).toBe(2);
 					expect(collection.atIndex(0).name).toBe("Fifteen");
 					expect(collection.atIndex(1).name).toBe("Twentyfive");
+
+					let req = server.getNextRequest();
+					expect(req).toBe(undefined);
+				});
+			});
+		});
+
+		it("emits an add event on primitive add", () => {
+			return getServerResource('service.primitives', primitiveCollectionResources).then(collection => {
+				collection.on('add', cb);
+
+				server.sendEvent('service.primitives', 'add', { value: "bar", idx: 0 });
+				server.sendEvent('service.primitives', 'add', { value: 52, idx: 3 });
+				server.sendEvent('service.primitives', 'add', { value: "end", idx: 7 });
+
+				return flushRequests().then(() => {
+					expect(cb.mock.calls.length).toBe(3);
+					expect(cb.mock.calls[0][0]).toEqual({ idx: 0, item: "bar" });
+					expect(cb.mock.calls[0][1]).toBe(collection);
+					expect(cb.mock.calls[1][0]).toEqual({ idx: 3, item: 52 });
+					expect(cb.mock.calls[1][1]).toBe(collection);
+					expect(cb.mock.calls[2][0]).toEqual({ idx: 7, item: "end" });
+					expect(cb.mock.calls[2][1]).toBe(collection);
+
+					expect(collection.length).toBe(8);
+					expect(collection.atIndex(0)).toBe("bar");
+					expect(collection.atIndex(1)).toBe("foo");
+					expect(collection.atIndex(2)).toBe(42);
+					expect(collection.atIndex(3)).toBe(52);
+					expect(collection.atIndex(4)).toBe(true);
+					expect(collection.atIndex(5)).toBe(false);
+					expect(collection.atIndex(6)).toBe(null);
+					expect(collection.atIndex(7)).toBe("end");
+
+					let req = server.getNextRequest();
+					expect(req).toBe(undefined);
+				});
+			});
+		});
+
+		it("emits a remove event on primitive remove", () => {
+			return getServerResource('service.primitives', primitiveCollectionResources).then(collection => {
+				collection.on('remove', cb);
+
+				let item0 = collection.atIndex(0);
+				let item1 = collection.atIndex(2);
+				let item2 = collection.atIndex(4);
+
+				server.sendEvent('service.primitives', 'remove', { idx: 0 });
+				server.sendEvent('service.primitives', 'remove', { idx: 1 });
+				server.sendEvent('service.primitives', 'remove', { idx: 2 });
+
+				return flushRequests().then(() => {
+					expect(cb.mock.calls.length).toBe(3);
+					expect(cb.mock.calls[0][0]).toEqual({ idx: 0, item: item0 });
+					expect(cb.mock.calls[0][1]).toBe(collection);
+					expect(cb.mock.calls[1][0]).toEqual({ idx: 1, item: item1 });
+					expect(cb.mock.calls[1][1]).toBe(collection);
+					expect(cb.mock.calls[2][0]).toEqual({ idx: 2, item: item2 });
+					expect(cb.mock.calls[2][1]).toBe(collection);
+
+					expect(collection.length).toBe(2);
+					expect(collection.atIndex(0)).toBe(42);
+					expect(collection.atIndex(1)).toBe(false);
 
 					let req = server.getNextRequest();
 					expect(req).toBe(undefined);
