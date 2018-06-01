@@ -27,6 +27,14 @@ const actionDelete = { action: 'delete' };
 const defaultNamespace = 'resclient';
 const reconnectDelay = 3000;
 const subscribeStaleDelay = 2000;
+// Traverse states
+const stateExposed = 1;
+const stateUnexposed = 2;
+// Traverse marks
+const markKeep = 1;
+const markDelete = 2;
+const markStale = 3;
+const markCover = 4;
 
 /**
  * ResClient is a client implementing the RES-Client protocol.
@@ -66,7 +74,20 @@ class ResClient {
 			model: {
 				id: typeModel,
 				list: new TypeList(defaultModelFactory),
-				prepareData: dta => dta,
+				prepareData: dta => {
+					let o = Object.assign({}, dta);
+					let v;
+					for (let k in o) {
+						v = o[k];
+						// Is the value a reference, get the actual item from cache
+						if (typeof v === 'object' && v !== null && v.rid) {
+							let ci = this.cache[v.rid];
+							ci.addIndirect();
+							o[k] = ci.item;
+						}
+					}
+					return o;
+				},
 				getFactory: function(rid) { return this.list.getFactory(rid); },
 				syncronize: this._syncModel.bind(this)
 			},
@@ -75,7 +96,7 @@ class ResClient {
 				list: new TypeList(defaultCollectionFactory),
 				prepareData: dta => dta.map(v => {
 					// Is the value a reference, get the actual item from cache
-					if (v != null && typeof v === 'object' && v.rid) {
+					if (typeof v === 'object' && v !== null && v.rid) {
 						let ci = this.cache[v.rid];
 						ci.addIndirect();
 						return ci.item;
@@ -398,21 +419,21 @@ class ResClient {
 		let event = data.event.substr(idx + 1);
 		let handled = false;
 		switch (event) {
-			case 'change':
-				handled = this._handleChangeEvent(cacheItem, event, data.data);
-				break;
+		case 'change':
+			handled = this._handleChangeEvent(cacheItem, event, data.data);
+			break;
 
-			case 'add':
-				handled = this._handleAddEvent(cacheItem, event, data.data);
-				break;
+		case 'add':
+			handled = this._handleAddEvent(cacheItem, event, data.data);
+			break;
 
-			case 'remove':
-				handled = this._handleRemoveEvent(cacheItem, event, data.data);
-				break;
+		case 'remove':
+			handled = this._handleRemoveEvent(cacheItem, event, data.data);
+			break;
 
-			case 'unsubscribe':
-				handled = this._handleUnsubscribeEvent(cacheItem, event);
-				break;
+		case 'unsubscribe':
+			handled = this._handleUnsubscribeEvent(cacheItem, event);
+			break;
 		}
 
 		if (!handled) {
@@ -425,27 +446,47 @@ class ResClient {
 			return false;
 		}
 
+		this._cacheResources(data);
+
 		// Set deleted properties to undefined
-		let v;
-		for (let key in data) {
-			v = data[key];
-			if (v !== null && typeof v === 'object') {
+		let item = cacheItem.item;
+		let rm = null;
+		let v, ov, ci;
+		let vals = data.values;
+		for (let k in vals) {
+			v = vals[k];
+			if (typeof v === 'object' && v !== null) {
 				if (v.action === 'delete') {
-					data[key] = undefined;
+					vals[k] = undefined;
+				} if (v.rid) {
+					ci = this.cache[v.rid];
+					ci.addIndirect();
+					vals[k] = ci.item;
+					continue;
 				} else {
 					throw new Error("Unsupported model change value: ", v);
 				}
 			}
+
+			ov = item[k];
+			if (this._isResource(ov)) {
+				rm = rm || [];
+				rm.push(this.cache[ov.getResourceId()]);
+			}
 		}
 
-		if (cacheItem.type.change) {
-			cacheItem.type.change(cacheItem.item, data);
-		} else {
-			// Default behaviour
-			let changed = cacheItem.item.__update(data);
-			if (changed) {
-				this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + cacheItem.rid + '.' + event, changed);
+		// Remove indirect reference to resources no longer referenced in the model
+		if (rm) {
+			for (let ci of rm) {
+				ci.removeIndirect();
+				this._tryDelete(ci);
 			}
+		}
+
+		// Update the model with new values
+		let changed = cacheItem.item.__update(vals);
+		if (changed) {
+			this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + cacheItem.rid + '.' + event, changed);
 		}
 
 		return true;
@@ -629,38 +670,59 @@ class ResClient {
 	 * Tries to delete the cached item.
 	 * It will delete if there are no direct listeners, indirect references, or any subscription.
 	 * @param {object} cacheItem Cache item to delete
-	 * @returns {boolean} True if the item was deleted from cache, otherwise false
 	 * @private
 	 */
 	_tryDelete(cacheItem) {
-		if (cacheItem.indirect) {
-			return false;
-		}
+		let refs = {};
+		this._traverse(cacheItem, this._seekToDelete.bind(
+			this,
+			refs,
+			this._markseekExposed.bind(
+				this,
+				refs,
+				this._markCover.bind(
+					this,
+					refs
+				)
+			)
+		), stateExposed);
 
-		if (cacheItem.direct) {
-			if (!cacheItem.subscribed) {
-				this._setStale(cacheItem.rid);
+		for (let rid in refs) {
+			let r = refs[rid];
+			switch (r[3]) {
+			case markStale:
+				this._setStale(r[0].rid);
+				break;
+			case markDelete:
+				this._deleteRef(r[0]);
+				break;
 			}
-			return false;
 		}
+	}
 
-		if (cacheItem.subscribed) {
-			return false;
-		}
-
-		if (cacheItem.type === typeCollection) {
-			let col = cacheItem.item, refItem;
+	_deleteRef(ci) {
+		let item = ci.item, ri;
+		switch (ci.type) {
+		case typeCollection:
 			for (let v of col) {
-				refItem = this._getRefItem(v);
-				if (refItem) {
-					refItem.removeIndirect();
-					this._tryDelete(refItem);
+				ri = this._getRefItem(v);
+				if (ri) {
+					ri.removeIndirect();
 				}
 			}
+			break;
+		case typeModel:
+			for (let k in item) {
+				if (item.hasOwnProperty(k)) {
+					ri = this._getRefItem(item[k]);
+					if (ri) {
+						ri.removeIndirect();
+					}
+				}
+			}
+			break;
 		}
-
-		delete this.cache[cacheItem.rid];
-		return true;
+		delete this.cache[ci.rid];
 	}
 
 	_isResource(v) {
@@ -876,25 +938,198 @@ class ResClient {
 		}
 	}
 
-	_subscribeReferred(cacheItem) {
+	_subscribeReferred(ci) {
 		if (!this.connected) {
 			return;
 		}
 
-		if (cacheItem.type === typeCollection) {
-			let col = cacheItem.item, refItem;
-			for (let v of col) {
-				refItem = this._getRefItem(v);
+		let refs = {};
+		this._traverse(ci, this._seekToSubscribe.bind(this, refs, this._markCover.bind(this, refs)));
 
-				// Are we missing an existing subscription to the model while having
-				// direct references?
-				if (refItem && !refItem.subscribed && refItem.direct) {
-					refItem.setSubscribed(true);
-					this._send('subscribe.' + refItem.rid)
-						.catch(this._handleFailedSubscribe.bind(this, refItem));
-				}
+		for (let rid in refs) {
+			if (refs[rid] === true) {
+				let ci = this.cache[rid];
+				ci.setSubscribed(true);
+				this._send('subscribe.' + rid)
+					.catch(this._handleFailedSubscribe.bind(this, ci));
 			}
 		}
+	}
+
+	/**
+	 * Seeks for resources that no longer has any reference and may
+	 * be deleted. If a cache item has no indirect reference and no subscription,
+	 * but a direct listener, it will instead be marked stale.
+	 * Callback used with _traverse.
+	 * @param {*} refs References
+	 * @param {*} markDelete Mark to delete traverse callback
+	 * @param {*} ci Cache item
+	 * @param {*} state State as returned from parent's traverse callback
+	 * @returns {*} State to pass to children. False means no traversing to children.
+	 * @private
+	 */
+	_seekToDelete(refs, markDelete, ci, state) {
+		// Check if it is already subscribed
+		if (ci.subscribed) {
+			return false;
+		}
+
+		let rid = ci.rid;
+		let r = refs[rid];
+		let indirect;
+
+		// let firstHit = !!r;
+		// r = (r || ci.indirect) - 1;
+
+		// If reference is listened to directly, and there
+		// will be no more indirect references after the unsubscribe,
+		// we should mark it for subscription.
+		if (!r) {
+			indirect = ci.indirect - 1;
+			r = [ ci, indirect, state, markKeep ];
+			refs[rid] = r;
+			state = indirect ? stateUnexposed : state;
+		} else if (r[3] === markCover) {
+			return false;
+		} else {
+			indirect = --r[1];
+			state = false;
+		}
+
+		// If indirect counter reached 0 and the resource
+		// is exposed for deletion, traverse to markDelete.
+		if (r[1] === 0 && r[2] === stateExposed) {
+			this._traverse(ci, markDelete);
+		}
+
+		return state;
+	}
+
+	/**
+	 * Marks all references down the tree for deletion,
+	 * as long as they have reached 0 in indirect references.
+	 * If not, the reference will be get stateExposed, so that they
+	 * may be marked for deletion once/if the indirect counter reaches 0.
+	 * If the cacheItem is directly referenced, it will be marked stale
+	 * instead of marked for deletion.
+	 * Callback used with _traverse.
+	 * @param {*} refs References
+	 * @param {*} markCover Mark to cover traverse callback
+	 * @param {*} ci Cache item
+	 * @returns {*} State to pass to children. False means no traversing to children.
+	 */
+	_markDelete(refs, markCover, ci) {
+		// Check if it is already subscribed
+		if (ci.subscribed) {
+			return false;
+		}
+
+		let rid = ci.rid;
+		let r = refs[rid];
+
+		if (r) {
+			r[2] = stateExposed;
+			if (r[1] === 0 && r[3] === markKeep) {
+				if (r[0].direct) {
+					this._traverse(ci, markCover);
+					r[3] = markStale;
+					return false;
+				} else {
+					r[3] = markDelete;
+					return true;
+				}
+			}
+		} else {
+			refs[rid] = [ ci, ci.indirect, stateExposed, markKeep ];
+		}
+
+		return false;
+	}
+
+	/**
+	 * Marks all references down the tree as covered,
+	 * as in indirectly covered by a subscription (even if a stale one).
+	 * Callback used with _traverse.
+	 * @param {*} refs References
+	 * @param {*} ci Cache item
+	 * @returns {*} State to pass to children. False means no traversing to children.
+	 */
+	_markCover(refs, ci) {
+		if (ci.subscribed) {
+			return false;
+		}
+
+		let rid = ci.rid;
+		let r = refs[rid];
+
+		if (r) {
+			if (r[3] === markCover) {
+				return false;
+			}
+			r[3] = markCover;
+		} else {
+			refs[rid] = [ ci, 0, 0, markCover ];
+		}
+		return true;
+	}
+
+	/**
+	 * Seeks for directly listened resources that are not subscribed to
+	 * and are going to lose its indirect subscription.
+	 * Seek callback used with _traverse.
+	 * @param {*} refs References
+	 * @param {*} markCover Mark as covered callback
+	 * @param {*} ci Cache item
+	 * @returns {Boolean} True if traversing should continue down to the reference, otherwise false.
+	 * @private
+	 */
+	_seekToSubscribe(refs, markCover, ci) {
+		// Check if it is already subscribed
+		if (ci.subscribed) {
+			return false;
+		}
+
+		let rid = ci.rid;
+		let r = refs[rid];
+		if (r) {
+			// False means the reference is already covered by
+			// a parent subscription
+			if (r[3] === false) {
+				return false;
+			}
+		}
+
+		// The reference has been checked before.
+		// We should just decrease the counter
+		let firstHit = !!r;
+		r = (r || ci.indirect) - 1;
+
+		// // If reference is listened to directly, and there
+		// // will be no more indirect references after the unsubscribe,
+		// // we should mark it for subscription.
+		// if (!r && ci.direct) {
+		// 	this._traverse(ci, markCover, stateExposed);
+		// 	// True marks the ref as to be subscribed
+		// 	refs[rid] = [ci, ci.r, true;
+		// } else {
+		// 	refs[rid] = r;
+		// }
+
+		return firstHit;
+	}
+
+	_markCover(refs, ci) {
+		if (ci.subscribed) {
+			return false;
+		}
+
+		let rid = ci.rid;
+		// False means an indirect subscription is already
+		// provided by a parent object.
+		let r = refs[rid];
+		refs[rid] = false;
+		// Continue unless subscription was already marked.
+		return r !== false && r !== true;
 	}
 
 	_handleFailedSubscribe(cacheItem, err) {
@@ -921,6 +1156,40 @@ class ResClient {
 		a.href = url;
 
 		return a.href.replace(/^http/, 'ws');
+	}
+
+	_traverse(ci, cb, state, skipFirst = false) {
+		// Call callback to get new state to pass to
+		// children. If false, we should not traverse deeper
+		if (!skipFirst) {
+			state = cb(ci, state);
+			if (state === false) {
+				return;
+			}
+		}
+
+		let item = ci.item;
+		switch (ci.type) {
+		case typeCollection:
+			for (let v of item) {
+				let ci = this._getRefItem(v);
+				if (ci) {
+					this._traverse(ci, cb, state);
+				}
+			}
+			break;
+		case typeModel:
+			for (let k in item) {
+				if (item.hasOwnProperty(k)) {
+					let ci = this._getRefItem(item[k]);
+					if (ci) {
+						this._traverse(ci, cb, state);
+					}
+				}
+			}
+			break;
+		}
+		return refs;
 	}
 }
 

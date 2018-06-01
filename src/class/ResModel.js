@@ -125,19 +125,26 @@ class ResModel {
 	}
 
 	toJSON() {
+		let o, v;
 		if (this._definition) {
-			return obj.copy(this, this._definition);
+			o = obj.copy(this, this._definition);
 		} else {
-			let obj = {};
+			o = {};
 			for (let key in this) {
 				if (this.hasOwnProperty(key) &&
 					key.substr(0, 1) !== '_'
 				) {
-					obj[key] = this[key];
+					o[key] = this[key];
 				}
 			}
-			return obj;
 		}
+		for (let k in o) {
+			v = o[k];
+			if (typeof v === 'object' && v !== null && v.toJSON) {
+				o[k] = v.toJSON();
+			}
+		}
+		return o;
 	}
 }
 

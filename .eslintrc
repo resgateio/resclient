@@ -9,7 +9,7 @@
 	"rules": {
 		"semi": ["error", "always"],
 		"indent": ["error", "tab", {
-			"SwitchCase": 1,
+			"SwitchCase": 0,
 			"ObjectExpression": 1,
 			"MemberExpression": 1,
 			"VariableDeclarator": 1,
