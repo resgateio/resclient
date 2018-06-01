@@ -5,11 +5,11 @@ class CacheItem {
 	/**
 	 * Creates a CacheItem instance
 	 * @param {string} rid Resource ID
-	 * @param {function} unsubcribeCallback Unsubscribe callback
+	 * @param {function} unsubscribe Unsubscribe callback
 	 */
-	constructor(rid, unsubcribeCallback) {
+	constructor(rid, unsubscribe) {
 		this.rid = rid;
-		this._unsubscribe = unsubcribeCallback;
+		this._unsubscribe = unsubscribe;
 
 		this.type = null;
 		this.item = null;
@@ -53,7 +53,7 @@ class CacheItem {
 	}
 
 	addDirect() {
-		if (!this.direct && this.unsubTimeout) {
+		if (this.unsubTimeout) {
 			clearTimeout(this.unsubTimeout);
 			this.unsubTimeout = null;
 		}
