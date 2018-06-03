@@ -86,12 +86,14 @@ class CacheItem {
 		this.indirect++;
 	}
 
-	removeIndirect() {
+	removeIndirect(checkUnsubscribe = true) {
 		this.indirect--;
 		if (this.indirect < 0) {
 			throw "Indirect count reached below 0";
 		}
-		this._checkUnsubscribe();
+		if (checkUnsubscribe) {
+			this._checkUnsubscribe();
+		}
 	}
 
 }

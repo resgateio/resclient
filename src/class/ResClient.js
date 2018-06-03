@@ -759,11 +759,10 @@ class ResClient {
 		if (r.st === stateKeep) {
 			return false;
 		}
-		let hasIndirect = r.rc > 0;
 
 		// If we are marking to keep or if the reference
 		// is indirectly referenced elsewhere, keep marking.
-		if (hasIndirect || state === stateKeep) {
+		if (r.rc > 0 || state === stateKeep) {
 			r.st = stateKeep;
 			return stateKeep;
 		}
@@ -805,7 +804,7 @@ class ResClient {
 			for (let v of item) {
 				ri = this._getRefItem(v);
 				if (ri) {
-					ri.removeIndirect();
+					ri.removeIndirect(false);
 				}
 			}
 			break;
@@ -814,7 +813,7 @@ class ResClient {
 				if (item.hasOwnProperty(k)) {
 					ri = this._getRefItem(item[k]);
 					if (ri) {
-						ri.removeIndirect();
+						ri.removeIndirect(false);
 					}
 				}
 			}
