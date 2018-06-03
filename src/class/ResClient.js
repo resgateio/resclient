@@ -28,13 +28,10 @@ const defaultNamespace = 'resclient';
 const reconnectDelay = 3000;
 const subscribeStaleDelay = 2000;
 // Traverse states
-const stateExposed = 1;
-const stateUnexposed = 2;
-// Traverse marks
-const markKeep = 1;
-const markDelete = 2;
-const markStale = 3;
-const markCover = 4;
+const stateNone = 0;
+const stateDelete = 1;
+const stateKeep = 2;
+const stateStale = 3;
 
 /**
  * ResClient is a client implementing the RES-Client protocol.
@@ -458,7 +455,7 @@ class ResClient {
 			if (typeof v === 'object' && v !== null) {
 				if (v.action === 'delete') {
 					vals[k] = undefined;
-				} if (v.rid) {
+				} else if (v.rid) {
 					ci = this.cache[v.rid];
 					ci.addIndirect();
 					vals[k] = ci.item;
@@ -669,42 +666,143 @@ class ResClient {
 	/**
 	 * Tries to delete the cached item.
 	 * It will delete if there are no direct listeners, indirect references, or any subscription.
-	 * @param {object} cacheItem Cache item to delete
+	 * @param {object} ci Cache item to delete
 	 * @private
 	 */
-	_tryDelete(cacheItem) {
-		let refs = {};
-		this._traverse(cacheItem, this._seekToDelete.bind(
-			this,
-			refs,
-			this._markseekExposed.bind(
-				this,
-				refs,
-				this._markCover.bind(
-					this,
-					refs
-				)
-			)
-		), stateExposed);
+	_tryDelete(ci) {
+		let refs = this._getRefState(ci);
 
 		for (let rid in refs) {
 			let r = refs[rid];
-			switch (r[3]) {
-			case markStale:
-				this._setStale(r[0].rid);
+			switch (r.st) {
+			case stateStale:
+				this._setStale(rid);
 				break;
-			case markDelete:
-				this._deleteRef(r[0]);
+			case stateDelete:
+				this._deleteRef(r.ci);
 				break;
 			}
 		}
+	}
+
+	/**
+	 * Reference State object
+	 * @typedef {object} RefState
+	 * @property {CacheItem} ci Cache item
+	 * @property {Number} rc Reference count from external references.
+	 * @property {Number} st State. Is either stateDelete, stateKeep, or stateStale.
+	 */
+
+	/**
+	 * Gets the reference state for a cacheItem and all its references
+	 * if the cacheItem was to be removed.
+	 * @param {CacheItem} ci Cache item
+	 * @return {Object.<string, RefState>} A key value object with key being the rid, and value being a RefState array.
+	 * @private
+	 */
+	_getRefState(ci) {
+		let refs = {};
+		// Quick exit
+		if (ci.subscribed) {
+			return refs;
+		}
+		refs[ci.rid] = { ci, rc: ci.indirect, st: stateNone };
+		this._traverse(ci, this._seekRefs.bind(this, refs), 0, true);
+		this._traverse(ci, this._markDelete.bind(this, refs, this._markKeep.bind(this, refs)), stateDelete);
+		return refs;
+	}
+
+	/**
+	 * Seeks for resources that no longer has any reference and may
+	 * be deleted.
+	 * Callback used with _traverse.
+	 * @param {*} refs References
+	 * @param {*} ci Cache item
+	 * @param {*} state State as returned from parent's traverse callback
+	 * @returns {*} State to pass to children. False means no traversing to children.
+	 * @private
+	 */
+	_seekRefs(refs, ci, state) {
+		// Quick exit if it is already subscribed
+		if (ci.subscribed) {
+			return false;
+		}
+
+		let rid = ci.rid;
+		let r = refs[rid];
+		if (!r) {
+			refs[rid] = { ci, rc: ci.indirect - 1, st: stateNone };
+			return true;
+		}
+
+		r.rc--;
+		return false;
+	}
+
+	/**
+	 * Marks reference as stateDelete, stateKeep, or stateStale, depending on
+	 * the values returned from a _seekRefs traverse.
+	 * @param {*} refs References
+	 * @param {function} markKeep Mark keep traverse callback
+	 * @param {*} ci Cache item
+	 * @param {*} state State as returned from parent's traverse callback
+	 * @return {*} State to pass to children. False means no traversing to children.
+	 */
+	_markDelete(refs, markKeep, ci, state) {
+		// Quick exit if it is already subscribed
+		if (ci.subscribed) {
+			return false;
+		}
+
+		let r = refs[ci.rid];
+
+		if (r.st === stateKeep) {
+			return false;
+		}
+		let hasIndirect = r.rc > 0;
+
+		// If we are marking to keep or if the reference
+		// is indirectly referenced elsewhere, keep marking.
+		if (hasIndirect || state === stateKeep) {
+			r.st = stateKeep;
+			return stateKeep;
+		}
+
+		if (r.st !== stateNone) {
+			return false;
+		}
+
+		if (r.ci.direct) {
+			r.st = stateKeep;
+			this._traverse(ci, markKeep, 0, true);
+			r.st = stateStale;
+			return false;
+		}
+
+		r.st = stateDelete;
+		return stateDelete;
+	}
+
+	_markKeep(refs, ci) {
+		// Quick exit if it is already subscribed
+		if (ci.subscribed) {
+			return false;
+		}
+
+		let r = refs[ci.rid];
+
+		if (r.st === stateKeep) {
+			return false;
+		}
+		r.st = stateKeep;
+		return true;
 	}
 
 	_deleteRef(ci) {
 		let item = ci.item, ri;
 		switch (ci.type) {
 		case typeCollection:
-			for (let v of col) {
+			for (let v of item) {
 				ri = this._getRefItem(v);
 				if (ri) {
 					ri.removeIndirect();
@@ -802,13 +900,13 @@ class ResClient {
 		}
 
 		for (let rid in refs) {
-			let cacheItem = this.cache[rid];
-			type.syncronize(cacheItem, refs[rid]);
+			let ci = this.cache[rid];
+			type.syncronize(ci, refs[rid]);
 		}
 	}
 
 	_syncModel(cacheItem, data) {
-		this._handleChangeEvent(cacheItem, 'change', data);
+		this._handleChangeEvent(cacheItem, 'change', { values: data });
 	}
 
 	_syncCollection(cacheItem, data) {
@@ -919,217 +1017,34 @@ class ResClient {
 		}
 	}
 
-	_unsubscribeCacheItem(cacheItem) {
-		if (!cacheItem.subscribed) {
-			return this._tryDelete(cacheItem);
+	_unsubscribeCacheItem(ci) {
+		if (!ci.subscribed) {
+			return this._tryDelete(ci);
 		}
 
-		this._subscribeReferred(cacheItem);
+		this._subscribeReferred(ci);
 
-		if (this.connected) {
-			this._send('unsubscribe.' + cacheItem.rid)
-				.then(() => {
-					cacheItem.setSubscribed(false);
-					this._tryDelete(cacheItem);
-				})
-				.catch(err => this._tryDelete(cacheItem));
-		} else {
-			this._tryDelete(cacheItem);
-		}
+		this._send('unsubscribe.' + ci.rid)
+			.then(() => {
+				ci.setSubscribed(false);
+				this._tryDelete(ci);
+			})
+			.catch(err => this._tryDelete(ci));
 	}
 
 	_subscribeReferred(ci) {
-		if (!this.connected) {
-			return;
-		}
-
-		let refs = {};
-		this._traverse(ci, this._seekToSubscribe.bind(this, refs, this._markCover.bind(this, refs)));
+		ci.subscribed = false;
+		let refs = this._getRefState(ci);
+		ci.subscribed = true;
 
 		for (let rid in refs) {
-			if (refs[rid] === true) {
-				let ci = this.cache[rid];
-				ci.setSubscribed(true);
+			let r = refs[rid];
+			if (r.st === stateStale) {
+				r.ci.setSubscribed(true);
 				this._send('subscribe.' + rid)
-					.catch(this._handleFailedSubscribe.bind(this, ci));
+					.catch(this._handleFailedSubscribe.bind(this, r.ci));
 			}
 		}
-	}
-
-	/**
-	 * Seeks for resources that no longer has any reference and may
-	 * be deleted. If a cache item has no indirect reference and no subscription,
-	 * but a direct listener, it will instead be marked stale.
-	 * Callback used with _traverse.
-	 * @param {*} refs References
-	 * @param {*} markDelete Mark to delete traverse callback
-	 * @param {*} ci Cache item
-	 * @param {*} state State as returned from parent's traverse callback
-	 * @returns {*} State to pass to children. False means no traversing to children.
-	 * @private
-	 */
-	_seekToDelete(refs, markDelete, ci, state) {
-		// Check if it is already subscribed
-		if (ci.subscribed) {
-			return false;
-		}
-
-		let rid = ci.rid;
-		let r = refs[rid];
-		let indirect;
-
-		// let firstHit = !!r;
-		// r = (r || ci.indirect) - 1;
-
-		// If reference is listened to directly, and there
-		// will be no more indirect references after the unsubscribe,
-		// we should mark it for subscription.
-		if (!r) {
-			indirect = ci.indirect - 1;
-			r = [ ci, indirect, state, markKeep ];
-			refs[rid] = r;
-			state = indirect ? stateUnexposed : state;
-		} else if (r[3] === markCover) {
-			return false;
-		} else {
-			indirect = --r[1];
-			state = false;
-		}
-
-		// If indirect counter reached 0 and the resource
-		// is exposed for deletion, traverse to markDelete.
-		if (r[1] === 0 && r[2] === stateExposed) {
-			this._traverse(ci, markDelete);
-		}
-
-		return state;
-	}
-
-	/**
-	 * Marks all references down the tree for deletion,
-	 * as long as they have reached 0 in indirect references.
-	 * If not, the reference will be get stateExposed, so that they
-	 * may be marked for deletion once/if the indirect counter reaches 0.
-	 * If the cacheItem is directly referenced, it will be marked stale
-	 * instead of marked for deletion.
-	 * Callback used with _traverse.
-	 * @param {*} refs References
-	 * @param {*} markCover Mark to cover traverse callback
-	 * @param {*} ci Cache item
-	 * @returns {*} State to pass to children. False means no traversing to children.
-	 */
-	_markDelete(refs, markCover, ci) {
-		// Check if it is already subscribed
-		if (ci.subscribed) {
-			return false;
-		}
-
-		let rid = ci.rid;
-		let r = refs[rid];
-
-		if (r) {
-			r[2] = stateExposed;
-			if (r[1] === 0 && r[3] === markKeep) {
-				if (r[0].direct) {
-					this._traverse(ci, markCover);
-					r[3] = markStale;
-					return false;
-				} else {
-					r[3] = markDelete;
-					return true;
-				}
-			}
-		} else {
-			refs[rid] = [ ci, ci.indirect, stateExposed, markKeep ];
-		}
-
-		return false;
-	}
-
-	/**
-	 * Marks all references down the tree as covered,
-	 * as in indirectly covered by a subscription (even if a stale one).
-	 * Callback used with _traverse.
-	 * @param {*} refs References
-	 * @param {*} ci Cache item
-	 * @returns {*} State to pass to children. False means no traversing to children.
-	 */
-	_markCover(refs, ci) {
-		if (ci.subscribed) {
-			return false;
-		}
-
-		let rid = ci.rid;
-		let r = refs[rid];
-
-		if (r) {
-			if (r[3] === markCover) {
-				return false;
-			}
-			r[3] = markCover;
-		} else {
-			refs[rid] = [ ci, 0, 0, markCover ];
-		}
-		return true;
-	}
-
-	/**
-	 * Seeks for directly listened resources that are not subscribed to
-	 * and are going to lose its indirect subscription.
-	 * Seek callback used with _traverse.
-	 * @param {*} refs References
-	 * @param {*} markCover Mark as covered callback
-	 * @param {*} ci Cache item
-	 * @returns {Boolean} True if traversing should continue down to the reference, otherwise false.
-	 * @private
-	 */
-	_seekToSubscribe(refs, markCover, ci) {
-		// Check if it is already subscribed
-		if (ci.subscribed) {
-			return false;
-		}
-
-		let rid = ci.rid;
-		let r = refs[rid];
-		if (r) {
-			// False means the reference is already covered by
-			// a parent subscription
-			if (r[3] === false) {
-				return false;
-			}
-		}
-
-		// The reference has been checked before.
-		// We should just decrease the counter
-		let firstHit = !!r;
-		r = (r || ci.indirect) - 1;
-
-		// // If reference is listened to directly, and there
-		// // will be no more indirect references after the unsubscribe,
-		// // we should mark it for subscription.
-		// if (!r && ci.direct) {
-		// 	this._traverse(ci, markCover, stateExposed);
-		// 	// True marks the ref as to be subscribed
-		// 	refs[rid] = [ci, ci.r, true;
-		// } else {
-		// 	refs[rid] = r;
-		// }
-
-		return firstHit;
-	}
-
-	_markCover(refs, ci) {
-		if (ci.subscribed) {
-			return false;
-		}
-
-		let rid = ci.rid;
-		// False means an indirect subscription is already
-		// provided by a parent object.
-		let r = refs[rid];
-		refs[rid] = false;
-		// Continue unless subscription was already marked.
-		return r !== false && r !== true;
 	}
 
 	_handleFailedSubscribe(cacheItem, err) {
@@ -1189,7 +1104,6 @@ class ResClient {
 			}
 			break;
 		}
-		return refs;
 	}
 }
 

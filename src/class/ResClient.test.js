@@ -522,7 +522,7 @@ describe("ResClient", () => {
 			return getServerResource('service.model', modelResources).then(model => {
 				model.on('change', cb);
 
-				server.sendEvent('service.model', 'change', { foo: 'baz' });
+				server.sendEvent('service.model', 'change', { values: { foo: 'baz' }});
 				return flushRequests().then(() => {
 					expect(cb.mock.calls.length).toBe(1);
 					expect(cb.mock.calls[0][0]).toEqual({ foo: 'bar' });
@@ -1365,4 +1365,5 @@ describe("ResClient", () => {
 			});
 		});
 	});
+
 });
