@@ -17,8 +17,6 @@ class CacheItem {
 		this.indirect = 0;
 		this.subscribed = false;
 		this.promise = null;
-
-		this._checkUnsubscribe();
 	}
 
 	setSubscribed(isSubscribed) {
@@ -41,9 +39,7 @@ class CacheItem {
 		this.item = item;
 		this.type = type;
 		this.promise = null;
-		if (this.subscribed) {
-			this._checkUnsubscribe();
-		}
+		this._checkUnsubscribe();
 		return this;
 	}
 
@@ -65,34 +61,30 @@ class CacheItem {
 		if (this.direct < 0) {
 			throw "Direct count reached below 0";
 		}
-		this._checkUnsubscribe();
+		if (this.subscribed) {
+			this._checkUnsubscribe();
+		} else {
+			// The subscription is stale and should be removed directly
+			this._unsubscribe(this);
+		}
 	}
 
 	_checkUnsubscribe() {
-		if (this.direct || this.indirect || this.unsubTimeout) {
+		if (!this.subscribed || this.direct || this.unsubTimeout) {
 			return;
 		}
 
-		// Check if we are subscribed, we delay unsubscribing.
-		// If not, the data is anyway stale and may be removed directly
-		if (this.subscribed) {
-			this.unsubTimeout = setTimeout(() => this._unsubscribe(this), unsubscribeDelay);
-		} else {
-			this._unsubscribe(this);
-		}
+		this.unsubTimeout = setTimeout(() => this._unsubscribe(this), unsubscribeDelay);
 	}
 
 	addIndirect() {
 		this.indirect++;
 	}
 
-	removeIndirect(checkUnsubscribe = true) {
+	removeIndirect() {
 		this.indirect--;
 		if (this.indirect < 0) {
 			throw "Indirect count reached below 0";
-		}
-		if (checkUnsubscribe) {
-			this._checkUnsubscribe();
 		}
 	}
 

@@ -804,7 +804,7 @@ class ResClient {
 			for (let v of item) {
 				ri = this._getRefItem(v);
 				if (ri) {
-					ri.removeIndirect(false);
+					ri.removeIndirect();
 				}
 			}
 			break;
@@ -813,7 +813,7 @@ class ResClient {
 				if (item.hasOwnProperty(k)) {
 					ri = this._getRefItem(item[k]);
 					if (ri) {
-						ri.removeIndirect(false);
+						ri.removeIndirect();
 					}
 				}
 			}
