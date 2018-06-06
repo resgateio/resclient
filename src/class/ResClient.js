@@ -5,7 +5,7 @@ import CacheItem from './CacheItem';
 import TypeList from './TypeList';
 import ResCollection from './ResCollection';
 import ResModel from './ResModel';
-import ResError from './Error';
+import ResError from './ResError';
 
 const defaultModelFactory = function(api, rid) {
 	return new ResModel(api, rid);
