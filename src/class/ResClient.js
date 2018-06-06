@@ -1,10 +1,11 @@
+
+import eventBus from 'modapp/eventBus';
+import * as obj from 'modapp-utils/obj';
 import CacheItem from './CacheItem';
 import TypeList from './TypeList';
 import ResCollection from './ResCollection';
 import ResModel from './ResModel';
-import eventBus from 'modapp/eventBus';
-import * as obj from 'modapp-utils/obj';
-import { ResError } from './resError';
+import ResError from './Error';
 
 const defaultModelFactory = function(api, rid) {
 	return new ResModel(api, rid);
@@ -13,7 +14,7 @@ const defaultCollectionFactory = function(api, rid) {
 	return new ResCollection(api, rid);
 };
 const errorFactory = function(api, rid) {
-	// TODO
+	return new ResError(rid);
 };
 
 // Resource types
@@ -105,7 +106,8 @@ class ResClient {
 			},
 			error: {
 				id: typeError,
-				factory: errorFactory
+				prepareData: dta => dta,
+				getFactory: rid => errorFactory
 			}
 		};
 
@@ -379,13 +381,26 @@ class ResClient {
 	}
 
 	_handleErrorResponse(req, data) {
+		let m = req.method;
+		// Extract the rid if possible
+		let rid = "";
+		let i = m.indexOf('.');
+		if (i >= 0) {
+			rid = m.substr(i + 1);
+			let a = m.substr(0, i);
+			if (a === 'call' || a === 'auth') {
+				i = rid.lastIndexOf('.');
+				if (i >= 0) {
+					rid = rid.substr(0, i);
+				}
+			}
+		}
 		let err = new ResError(
-			data.error.code,
-			data.error.message,
-			data.error.data,
-			req.method,
+			rid.trim(),
+			m,
 			req.params
 		);
+		err.__init(data.error);
 		try {
 			this._emit('error', err);
 		} catch (ex) {}
@@ -832,8 +847,11 @@ class ResClient {
 		}
 		let rid = v.getResourceId();
 		let refItem = this.cache[rid];
+		// refItem not in cache means
+		// item has been deleted as part of
+		// a refState object.
 		if (!refItem) {
-			throw new Error("Collection resource not found in cache");
+			return null;
 		}
 		return refItem;
 	}
@@ -1107,3 +1125,7 @@ class ResClient {
 }
 
 export default ResClient;
+
+export function isResError(o) {
+	return o instanceof ResError;
+};
