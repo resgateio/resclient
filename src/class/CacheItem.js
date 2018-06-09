@@ -77,12 +77,12 @@ class CacheItem {
 		this.unsubTimeout = setTimeout(() => this._unsubscribe(this), unsubscribeDelay);
 	}
 
-	addIndirect() {
-		this.indirect++;
+	addIndirect(n = 1) {
+		this.indirect += n;
 	}
 
-	removeIndirect() {
-		this.indirect--;
+	removeIndirect(n = 1) {
+		this.indirect -= n;
 		if (this.indirect < 0) {
 			throw "Indirect count reached below 0";
 		}

@@ -107,7 +107,8 @@ class ResClient {
 			error: {
 				id: typeError,
 				prepareData: dta => dta,
-				getFactory: rid => errorFactory
+				getFactory: rid => errorFactory,
+				syncronize: () => {}
 			}
 		};
 
@@ -226,27 +227,26 @@ class ResClient {
 	 */
 	getResource(rid) {
 		// Check for resource in cache
-		let cacheItem = this.cache[rid];
-		if (cacheItem) {
-			return cacheItem.promise ? cacheItem.promise : Promise.resolve(cacheItem.item);
+		let ci = this.cache[rid];
+		if (ci) {
+			return ci.promise ? ci.promise : Promise.resolve(ci.item);
 		}
 
-		cacheItem = new CacheItem(rid, this._unsubscribeCacheItem).setSubscribed(true);
-		this.cache[rid] = cacheItem;
+		ci = new CacheItem(rid, this._unsubscribeCacheItem).setSubscribed(true);
+		this.cache[rid] = ci;
 
-		cacheItem.setPromise(this._send('subscribe.' + rid)
+		ci.setPromise(this._send('subscribe.' + rid)
 			.then(response => {
 				this._cacheResources(response);
 				return this.cache[rid].item;
 			})
 			.catch(err => {
-				cacheItem.setSubscribed(false);
-				this._tryDelete(cacheItem);
+				this._handleFailedSubscribe(ci);
 				throw err;
 			})
 		);
 
-		return cacheItem.promise;
+		return ci.promise;
 	}
 
 	/**
@@ -462,8 +462,8 @@ class ResClient {
 
 		// Set deleted properties to undefined
 		let item = cacheItem.item;
-		let rm = null;
-		let v, ov, ci;
+		let rm = {};
+		let v, ov, ci, r;
 		let vals = data.values;
 		for (let k in vals) {
 			v = vals[k];
@@ -472,9 +472,12 @@ class ResClient {
 					vals[k] = undefined;
 				} else if (v.rid) {
 					ci = this.cache[v.rid];
-					ci.addIndirect();
 					vals[k] = ci.item;
-					continue;
+					if (rm.hasOwnProperty(v.rid)) {
+						rm[v.rid]--;
+					} else {
+						rm[v.rid] = -1;
+					}
 				} else {
 					throw new Error("Unsupported model change value: ", v);
 				}
@@ -482,15 +485,20 @@ class ResClient {
 
 			ov = item[k];
 			if (this._isResource(ov)) {
-				rm = rm || [];
-				rm.push(this.cache[ov.getResourceId()]);
+				if (rm.hasOwnProperty(v.rid)) {
+					rm[v.rid]++;
+				} else {
+					rm[v.rid] = 1;
+				}
 			}
 		}
 
 		// Remove indirect reference to resources no longer referenced in the model
-		if (rm) {
-			for (let ci of rm) {
-				ci.removeIndirect();
+		for (let rid in rm) {
+			r = rm[rid];
+			ci = this.cache[rid];
+			ci.removeIndirect(r);
+			if (r > 0) {
 				this._tryDelete(ci);
 			}
 		}
@@ -533,7 +541,7 @@ class ResClient {
 		let item = cacheItem.item.__remove(idx);
 		this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + cacheItem.rid + '.' + event, { item, idx });
 
-		if (item !== null && typeof item === 'object' && typeof item.getResourceId === 'function') {
+		if (this._isResource(item)) {
 			let refItem = this.cache[item.getResourceId()];
 			if (!refItem) {
 				throw new Error("Removed model is not in cache");
@@ -553,11 +561,27 @@ class ResClient {
 	}
 
 	_setStale(rid) {
-		if (!this.connected) {
-			return;
+		this._addStale(rid);
+		if (this.connected) {
+			setTimeout(() => this._subscribeToStale(rid), subscribeStaleDelay);
 		}
+	}
 
-		setTimeout(() => this._subscribeToStale(rid), subscribeStaleDelay);
+	_addStale(rid) {
+		if (!this.stale) {
+			this.stale = {};
+		}
+		this.stale[rid] = true;
+	}
+
+	_removeStale(rid) {
+		if (this.stale) {
+			delete this.stale[rid];
+			for (let k in this.stale) {
+				return;
+			}
+			this.stale = null;
+		}
 	}
 
 	_subscribeToStale(rid) {
@@ -566,19 +590,23 @@ class ResClient {
 		}
 
 		// Check for resource in cache
-		let cacheItem = this.cache[rid];
-		if (!cacheItem || cacheItem.indirect || cacheItem.subscribed) {
+		let ci = this.cache[rid];
+		if (!ci || !ci.item || ci.indirect || ci.subscribed) {
 			return;
 		}
 
-		cacheItem.setSubscribed(true);
+		ci.setSubscribed(true);
 		this._send('subscribe.' + rid)
 			.then(response => this._cacheResources(response))
-			.catch(this._handleFailedSubscribe.bind(this, cacheItem));
+			.catch(this._handleFailedSubscribe.bind(this, ci));
 	}
 
 	_subscribeToAllStale() {
-		for (let rid in this.cache) {
+		if (!this.stale) {
+			return;
+		}
+
+		for (let rid in this.stale) {
 			this._subscribeToStale(rid);
 		}
 	}
@@ -633,11 +661,14 @@ class ResClient {
 		if (this.connected) {
 			this.connected = false;
 
-			// Set any item in cache to stale
-			for (let id in this.cache) {
-				let cacheItem = this.cache[id];
-				this.cache[id].setSubscribed(false);
-				this._tryDelete(cacheItem);
+			// Set any subscribed item in cache to stale
+			for (let rid in this.cache) {
+				let ci = this.cache[rid];
+				if (ci.subscribed) {
+					ci.setSubscribed(false);
+					this._addStale(rid);
+					this._tryDelete(ci);
+				}
 			}
 
 			this._emit('close', e);
@@ -835,6 +866,7 @@ class ResClient {
 			break;
 		}
 		delete this.cache[ci.rid];
+		this._removeStale(ci.rid);
 	}
 
 	_isResource(v) {
@@ -880,6 +912,9 @@ class ResClient {
 					rid,
 					this._unsubscribeCacheItem
 				);
+			} else {
+				// Remove item as stale if needed
+				this._removeStale(rid);
 			}
 			// If an item is already set,
 			// it has gone stale and needs to be syncronized.
