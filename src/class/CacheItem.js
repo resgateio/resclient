@@ -64,7 +64,7 @@ class CacheItem {
 		if (this.subscribed) {
 			this._checkUnsubscribe();
 		} else {
-			// The subscription is stale and should be removed directly
+			// The subscription might be stale and should then be removed directly
 			this._unsubscribe(this);
 		}
 	}
