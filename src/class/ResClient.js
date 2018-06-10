@@ -117,7 +117,7 @@ class ResClient {
 		this._handleOnerror = this._handleOnerror.bind(this);
 		this._handleOnmessage = this._handleOnmessage.bind(this);
 		this._handleOnclose = this._handleOnclose.bind(this);
-		this._unsubscribeCacheItem = this._unsubscribeCacheItem.bind(this);
+		this._unsubscribe = this._unsubscribe.bind(this);
 	}
 
 	/**
@@ -232,21 +232,12 @@ class ResClient {
 			return ci.promise ? ci.promise : Promise.resolve(ci.item);
 		}
 
-		ci = new CacheItem(rid, this._unsubscribeCacheItem).setSubscribed(true);
+		ci = new CacheItem(rid, this._unsubscribe);
 		this.cache[rid] = ci;
 
-		ci.setPromise(this._send('subscribe.' + rid)
-			.then(response => {
-				this._cacheResources(response);
-				return this.cache[rid].item;
-			})
-			.catch(err => {
-				this._handleFailedSubscribe(ci);
-				throw err;
-			})
+		return ci.setPromise(
+			this._subscribe(ci, true).then(() => ci.item)
 		);
-
-		return ci.promise;
 	}
 
 	/**
@@ -485,10 +476,11 @@ class ResClient {
 
 			ov = item[k];
 			if (this._isResource(ov)) {
-				if (rm.hasOwnProperty(v.rid)) {
-					rm[v.rid]++;
+				let rid = ov.getResourceId();
+				if (rm.hasOwnProperty(rid)) {
+					rm[rid]++;
 				} else {
-					rm[v.rid] = 1;
+					rm[rid] = 1;
 				}
 			}
 		}
@@ -584,21 +576,26 @@ class ResClient {
 		}
 	}
 
-	_subscribeToStale(rid) {
-		if (!this.connected) {
-			return;
-		}
-
-		// Check for resource in cache
-		let ci = this.cache[rid];
-		if (!ci || !ci.item || ci.indirect || ci.subscribed) {
-			return;
-		}
-
+	_subscribe(ci, throwError) {
+		let rid = ci.rid;
 		ci.setSubscribed(true);
-		this._send('subscribe.' + rid)
+		this._removeStale(rid);
+		return this._send('subscribe.' + rid)
 			.then(response => this._cacheResources(response))
-			.catch(this._handleFailedSubscribe.bind(this, ci));
+			.catch(err => {
+				this._handleFailedSubscribe(ci);
+				if (throwError) {
+					throw err;
+				}
+			});
+	}
+
+	_subscribeToStale(rid) {
+		if (!this.connected || !this.stale || !this.stale[rid]) {
+			return;
+		}
+
+		this._subscribe(this.cache[rid]);
 	}
 
 	_subscribeToAllStale() {
@@ -910,7 +907,7 @@ class ResClient {
 			if (!ci) {
 				ci = this.cache[rid] = new CacheItem(
 					rid,
-					this._unsubscribeCacheItem
+					this._unsubscribe
 				);
 			} else {
 				// Remove item as stale if needed
@@ -1069,7 +1066,7 @@ class ResClient {
 		}
 	}
 
-	_unsubscribeCacheItem(ci) {
+	_unsubscribe(ci) {
 		if (!ci.subscribed) {
 			return this._tryDelete(ci);
 		}
@@ -1092,9 +1089,7 @@ class ResClient {
 		for (let rid in refs) {
 			let r = refs[rid];
 			if (r.st === stateStale) {
-				r.ci.setSubscribed(true);
-				this._send('subscribe.' + rid)
-					.catch(this._handleFailedSubscribe.bind(this, r.ci));
+				this._subscribe(r.ci);
 			}
 		}
 	}
