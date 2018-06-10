@@ -32,7 +32,7 @@ class CacheItem {
 		if (!this.item) {
 			this.promise = promise;
 		}
-		return this;
+		return promise;
 	}
 
 	setItem(item, type) {
