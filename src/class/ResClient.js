@@ -568,7 +568,7 @@ class ResClient {
 
 	_removeStale(rid) {
 		if (this.stale) {
-			delete this.stale[rid];
+			delete this.stalnotese[rid];
 			for (let k in this.stale) {
 				return;
 			}
@@ -751,7 +751,7 @@ class ResClient {
 		}
 		refs[ci.rid] = { ci, rc: ci.indirect, st: stateNone };
 		this._traverse(ci, this._seekRefs.bind(this, refs), 0, true);
-		this._traverse(ci, this._markDelete.bind(this, refs, this._markKeep.bind(this, refs)), stateDelete);
+		this._traverse(ci, this._markDelete.bind(this, refs), stateDelete);
 		return refs;
 	}
 
@@ -791,53 +791,46 @@ class ResClient {
 	 * @param {*} state State as returned from parent's traverse callback
 	 * @return {*} State to pass to children. False means no traversing to children.
 	 */
-	_markDelete(refs, markKeep, ci, state) {
+	_markDelete(refs, ci, state) {
 		// Quick exit if it is already subscribed
 		if (ci.subscribed) {
 			return false;
 		}
 
-		let r = refs[ci.rid];
+		let rid = ci.rid;
+		let r = refs[rid];
 
 		if (r.st === stateKeep) {
 			return false;
 		}
 
-		// If we are marking to keep or if the reference
-		// is indirectly referenced elsewhere, keep marking.
-		if (r.rc > 0 || state === stateKeep) {
-			r.st = stateKeep;
-			return stateKeep;
+		if (state === stateDelete) {
+
+			if (r.rc > 0) {
+				r.st = stateKeep;
+				return rid;
+			}
+
+			if (r.st !== stateNone) {
+				return false;
+			}
+
+			if (r.ci.direct) {
+				r.st = stateStale;
+				return rid;
+			}
+
+			r.st = stateDelete;
+			return stateDelete;
 		}
 
-		if (r.st !== stateNone) {
+		// A stale item can never cover itself
+		if (rid === state) {
 			return false;
 		}
 
-		if (r.ci.direct) {
-			r.st = stateKeep;
-			this._traverse(ci, markKeep, 0, true);
-			r.st = stateStale;
-			return false;
-		}
-
-		r.st = stateDelete;
-		return stateDelete;
-	}
-
-	_markKeep(refs, ci) {
-		// Quick exit if it is already subscribed
-		if (ci.subscribed) {
-			return false;
-		}
-
-		let r = refs[ci.rid];
-
-		if (r.st === stateKeep) {
-			return false;
-		}
 		r.st = stateKeep;
-		return true;
+		return r.rc > 0 ? rid : state;
 	}
 
 	_deleteRef(ci) {
@@ -1068,7 +1061,10 @@ class ResClient {
 
 	_unsubscribe(ci) {
 		if (!ci.subscribed) {
-			return this._tryDelete(ci);
+			if (this.stale && this.stale[ci.rid]) {
+				this._tryDelete(ci);
+			}
+			return;
 		}
 
 		this._subscribeReferred(ci);
