@@ -271,5 +271,33 @@ describe("ResClient Garbage collection", () => {
 			});
 		});
 
+		it("marks none for deletion if any reference in a cycle is indirectly references from other root", () => {
+			let rs = getRefState({
+				a: { refs: [ 'b' ] },
+				b: { refs: [ 'a' ] },
+				c: { refs: [ 'b' ] }
+			}, 'a');
+
+			expectRefState(rs, {
+				a: stateKeep,
+				b: stateKeep
+			});
+		});
+
+		it("marks stale references as keep if any reference in a cycle is indirectly referencesd from other root", () => {
+			let rs = getRefState({
+				a: { refs: [ 'b' ] },
+				b: { refs: [ 'c' ], direct: 1 },
+				c: { refs: [ 'a' ] },
+				d: { refs: [ 'a' ] }
+			}, 'a');
+
+			expectRefState(rs, {
+				a: stateKeep,
+				b: stateKeep,
+				c: stateKeep
+			});
+		});
+
 	});
 });
