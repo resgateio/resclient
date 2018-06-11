@@ -277,14 +277,14 @@ class ResClient {
 	}
 
 	/**
-	 * Calls a method on the model.
-	 * @param {string} modelId Model resource ID.
+	 * Calls a method on a resource.
+	 * @param {string} rid Resource ID.
 	 * @param {string} method Method name
 	 * @param {*} params Method parameters
 	 * @returns {Promise.<object>} Promise of the call result.
 	 */
-	callModel(modelId, method, params) {
-		return this._send('call.' + modelId + '.' + method, params);
+	callResource(rid, method, params) {
+		return this._send('call.' + rid + '.' + method, params);
 	}
 
 	authenticate(rid, method, params) {
@@ -786,7 +786,6 @@ class ResClient {
 	 * Marks reference as stateDelete, stateKeep, or stateStale, depending on
 	 * the values returned from a _seekRefs traverse.
 	 * @param {*} refs References
-	 * @param {function} markKeep Mark keep traverse callback
 	 * @param {*} ci Cache item
 	 * @param {*} state State as returned from parent's traverse callback
 	 * @return {*} State to pass to children. False means no traversing to children.
