@@ -568,7 +568,7 @@ class ResClient {
 
 	_removeStale(rid) {
 		if (this.stale) {
-			delete this.stalnotese[rid];
+			delete this.stale[rid];
 			for (let k in this.stale) {
 				return;
 			}
