@@ -1058,7 +1058,7 @@ describe("ResClient", () => {
 		});
 
 		it("postpones any request until setOnConnect callback resolves", () => {
-			let onConnect = jest.fn(() => client.callModel('service.model', 'test'));
+			let onConnect = jest.fn(() => client.callResource('service.model', 'test'));
 			client.setOnConnect(onConnect);
 
 			let promise = client.getResource('service.model');

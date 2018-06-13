@@ -74,9 +74,7 @@ class ResCollection {
 	 * @returns {*} Item with the id. Undefined if key doesn't exist
 	 */
 	get(id) {
-		if (!this._idCallback) {
-			throw new Error("No id callback defined");
-		}
+		this._hasId();
 		return this._map[id];
 	}
 
@@ -110,12 +108,22 @@ class ResCollection {
 
 	/**
 	 * Removes an existing model from the collection at the server.
-	 * Server will return an error if the collection doesn't support removal.
+	 * Server will return an error if the collection doesn't support model deletion.
 	 * @param {string} modelId Model resource id
 	 * @return {Promise} Promise of the removal.
 	 */
 	remove(modelId) {
 		return this._api.removeModel(this._rid, modelId);
+	}
+
+	/**
+	 * Calls a method on the collection.
+	 * @param {string} method Method name
+	 * @param {*} params Method parameters
+	 * @returns {Promise.<object>} Promise of the call result.
+	 */
+	call(method, params) {
+		return this._api.callResource(this._rid, method, params);
 	}
 
 	/**
@@ -182,6 +190,12 @@ class ResCollection {
 		}
 
 		return item;
+	}
+
+	_hasId() {
+		if (!this._idCallback) {
+			throw new Error("No id callback defined");
+		}
 	}
 
 	toJSON() {
