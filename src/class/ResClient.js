@@ -208,6 +208,15 @@ class ResClient {
 	}
 
 	/**
+	 * Unregister a previously registered model type pattern.
+	 * @param {string} pattern Pattern of the model type.
+	 * @returns {resourceFactoryCallback} Unregistered model factory callback
+	 */
+	unregisterModelType(pattern) {
+		return this.types.model.list.removeFactory(pattern);
+	}
+
+	/**
 	 * Register a collection type.
 	 * The pattern may use the following wild cards:
 	 * * The asterisk (*) matches any part at any level of the resource name.
@@ -217,6 +226,19 @@ class ResClient {
 	 */
 	registerCollectionType(pattern, factory) {
 		this.types.collection.list.addFactory(pattern, factory);
+	}
+
+	/**
+	 * Unregister a previously registered collection type pattern.
+	 * @param {string} pattern Pattern of the collection type.
+	 * @returns {resourceFactoryCallback} Unregistered collection factory callback
+	 */
+	unregisterCollectionType(pattern) {
+		return this.types.model.list.removeFactory(pattern);
+	}
+
+	unregisterCollectionType(pattern) {
+		return this.types.model.list.removeFactory(pattern);
 	}
 
 	/**
