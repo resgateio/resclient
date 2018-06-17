@@ -6,6 +6,9 @@
 # Build files.
 /class
 /def
+/dist
+/lib
+/es
 /*.js
 /*.tgz
 
