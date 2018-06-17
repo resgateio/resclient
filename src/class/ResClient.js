@@ -190,7 +190,7 @@ class ResClient {
 
 	/**
 	 * Resource factory callback
-	 * @callback ResClient~resourceFactoryCallback
+	 * @callback resourceFactoryCallback
 	 * @param {ResClient} api ResClient instance
 	 * @param {string} rid Resource ID
 	 */
@@ -201,7 +201,7 @@ class ResClient {
 	 * * The asterisk (*) matches any part at any level of the resource name.
 	 * * The greater than symbol (>) matches one or more parts at the end of a resource name, and must be the last part.
 	 * @param {string} pattern Pattern of the model type.
-	 * @param {ResClient~resourceFactoryCallback} factory Model factory callback
+	 * @param {resourceFactoryCallback} factory Model factory callback
 	 */
 	registerModelType(pattern, factory) {
 		this.types.model.list.addFactory(pattern, factory);
@@ -734,6 +734,7 @@ class ResClient {
 	 * @property {CacheItem} ci Cache item
 	 * @property {Number} rc Reference count from external references.
 	 * @property {Number} st State. Is either stateDelete, stateKeep, or stateStale.
+	 * @private
 	 */
 
 	/**
@@ -789,6 +790,7 @@ class ResClient {
 	 * @param {*} ci Cache item
 	 * @param {*} state State as returned from parent's traverse callback
 	 * @return {*} State to pass to children. False means no traversing to children.
+	 * @private
 	 */
 	_markDelete(refs, ci, state) {
 		// Quick exit if it is already subscribed

@@ -3,6 +3,9 @@
         "test": {
             "presets": [
                 ["env"]
+            ],
+            "ignore": [
+                "**/*.test.js"
             ]
         },
         "commonjs": {
@@ -10,6 +13,9 @@
                 ["env", {
                     "useBuiltIns": false
                 }]
+            ],
+            "ignore": [
+                "**/*.test.js"
             ]
         },
         "es": {
@@ -18,6 +24,9 @@
                     "useBuiltIns": false,
                     "modules": false
                 }]
+            ],
+            "plugins": [
+                "external-helpers"
             ]
         }
     }
