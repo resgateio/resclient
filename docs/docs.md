@@ -39,7 +39,9 @@ ResClient is a client implementing the RES-Client protocol.
     * [.off(events, [handler])](#ResClient+off)
     * [.setOnConnect(onConnect)](#ResClient+setOnConnect) ⇒ <code>this</code>
     * [.registerModelType(pattern, factory)](#ResClient+registerModelType)
+    * [.unregisterModelType(pattern)](#ResClient+unregisterModelType) ⇒ [<code>resourceFactoryCallback</code>](#resourceFactoryCallback)
     * [.registerCollectionType(pattern, factory)](#ResClient+registerCollectionType)
+    * [.unregisterCollectionType(pattern)](#ResClient+unregisterCollectionType) ⇒ [<code>resourceFactoryCallback</code>](#resourceFactoryCallback)
     * [.getResource(rid, [collectionFactory])](#ResClient+getResource) ⇒ <code>Promise.&lt;(ResModel\|ResCollection)&gt;</code>
     * [.createModel(collectionId, props)](#ResClient+createModel) ⇒ [<code>Promise.&lt;ResModel&gt;</code>](#ResModel)
     * [.setModel(modelId, props)](#ResClient+setModel) ⇒ <code>Promise.&lt;object&gt;</code>
@@ -131,6 +133,18 @@ The pattern may use the following wild cards:
 | pattern | <code>string</code> | Pattern of the model type. |
 | factory | [<code>resourceFactoryCallback</code>](#resourceFactoryCallback) | Model factory callback |
 
+<a name="ResClient+unregisterModelType"></a>
+
+### resClient.unregisterModelType(pattern) ⇒ [<code>resourceFactoryCallback</code>](#resourceFactoryCallback)
+Unregister a previously registered model type pattern.
+
+**Kind**: instance method of [<code>ResClient</code>](#ResClient)  
+**Returns**: [<code>resourceFactoryCallback</code>](#resourceFactoryCallback) - Unregistered model factory callback  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| pattern | <code>string</code> | Pattern of the model type. |
+
 <a name="ResClient+registerCollectionType"></a>
 
 ### resClient.registerCollectionType(pattern, factory)
@@ -145,6 +159,18 @@ The pattern may use the following wild cards:
 | --- | --- | --- |
 | pattern | <code>string</code> | Pattern of the collection type. |
 | factory | <code>ResClient~resourceFactoryCallback</code> | Collection factory callback |
+
+<a name="ResClient+unregisterCollectionType"></a>
+
+### resClient.unregisterCollectionType(pattern) ⇒ [<code>resourceFactoryCallback</code>](#resourceFactoryCallback)
+Unregister a previously registered collection type pattern.
+
+**Kind**: instance method of [<code>ResClient</code>](#ResClient)  
+**Returns**: [<code>resourceFactoryCallback</code>](#resourceFactoryCallback) - Unregistered collection factory callback  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| pattern | <code>string</code> | Pattern of the collection type. |
 
 <a name="ResClient+getResource"></a>
 

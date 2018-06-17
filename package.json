@@ -11,7 +11,7 @@
     "build:umd:min": "cross-env BABEL_ENV=es NODE_ENV=production rollup src/index.js --config --file dist/resclient.min.js",
     "build:docs": "jsdoc2md -f ./src/class/ResClient.js -f ./src/class/ResCollection.js -f ./src/class/ResModel.js -f ./src/def/eventCallback.js > ./docs/docs.md",
     "eslint": "eslint src/**/*.js",
-    "jest": "cross-env NODE_ENV=commonjs ./node_modules/.bin/jest src --coverage",
+    "jest": "jest src --coverage",
     "test": "npm run eslint && npm run jest"
   },
   "repository": {
@@ -32,6 +32,7 @@
   ],
   "devDependencies": {
     "babel-cli": "^6.26.0",
+    "babel-jest": "^23.0.1",
     "babel-plugin-external-helpers": "^6.22.0",
     "babel-preset-env": "^1.6.1",
     "cross-env": "^5.2.0",
