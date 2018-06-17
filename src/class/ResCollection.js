@@ -97,33 +97,13 @@ class ResCollection {
 	}
 
 	/**
-	 * Creates a new model for the collection at the server.
-	 * Server will return an error if the collection doesn't support model creation.
-	 * @param {object} props Model properties
-	 * @returns {Promise.<Model>} Promise of the created model.
-	 */
-	create(props) {
-		return this._api.createModel(this._rid, props);
-	}
-
-	/**
-	 * Removes an existing model from the collection at the server.
-	 * Server will return an error if the collection doesn't support model deletion.
-	 * @param {string} modelId Model resource id
-	 * @return {Promise} Promise of the removal.
-	 */
-	remove(modelId) {
-		return this._api.removeModel(this._rid, modelId);
-	}
-
-	/**
 	 * Calls a method on the collection.
 	 * @param {string} method Method name
 	 * @param {*} params Method parameters
 	 * @returns {Promise.<object>} Promise of the call result.
 	 */
 	call(method, params) {
-		return this._api.callResource(this._rid, method, params);
+		return this._api.call(this._rid, method, params);
 	}
 
 	/**

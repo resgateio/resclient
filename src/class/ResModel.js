@@ -72,7 +72,7 @@ class ResModel {
 	 * @returns {Promise.<object>} Promise of the call result.
 	 */
 	call(method, params) {
-		return this._api.callResource(this._rid, method, params);
+		return this._api.call(this._rid, method, params);
 	}
 
 	/**
