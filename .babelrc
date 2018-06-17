@@ -3,9 +3,6 @@
         "test": {
             "presets": [
                 ["env"]
-            ],
-            "ignore": [
-                "**/*.test.js"
             ]
         },
         "commonjs": {
@@ -27,6 +24,9 @@
             ],
             "plugins": [
                 "external-helpers"
+            ],
+            "ignore": [
+                "**/*.test.js"
             ]
         }
     }

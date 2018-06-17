@@ -118,6 +118,54 @@ describe("TypeList", () => {
 
 	});
 
+	describe("removeFactory", () => {
+
+		it("gets default factory function after removing without wildcard", () => {
+			typeList.addFactory('foo', fa);
+			expect(typeList.removeFactory('foo')).toBe(fa);
+			expect(typeList.getFactory('foo')).toBe(defaultFactory);
+			typeList.addFactory('foo.bar', fa);
+			expect(typeList.removeFactory('foo.bar')).toBe(fa);
+			expect(typeList.getFactory('foo.bar')).toBe(defaultFactory);
+		});
+
+		it("gets default factory function after removing * wildcard", () => {
+			typeList.addFactory('foo.*', fa);
+			typeList.addFactory('foo.bar.*', fb);
+			expect(typeList.removeFactory('foo.*')).toBe(fa);
+			expect(typeList.getFactory('foo.bar')).toBe(defaultFactory);
+			expect(typeList.getFactory('foo.bar.baz')).toBe(fb);
+		});
+
+		it("gets default factory function after removing > wildcard", () => {
+			typeList.addFactory('foo.>', fa);
+			expect(typeList.removeFactory('foo.>')).toBe(fa);
+			expect(typeList.getFactory('foo.bar')).toBe(defaultFactory);
+			expect(typeList.getFactory('foo.bar.baz')).toBe(defaultFactory);
+		});
+
+		it("gets a default factory function removing only * wildcard", () => {
+			typeList.addFactory('*', fa);
+			expect(typeList.removeFactory('*')).toBe(fa);
+			expect(typeList.getFactory('foo')).toBe(defaultFactory);
+		});
+
+		it("gets a default factory function removing only > wildcard", () => {
+			typeList.addFactory('>', fa);
+			expect(typeList.removeFactory('>')).toBe(fa);
+			expect(typeList.getFactory('foo')).toBe(defaultFactory);
+			expect(typeList.getFactory('foo.bar')).toBe(defaultFactory);
+		});
+
+		it("gets factory function on match after removing longer pattern", () => {
+			typeList.addFactory('foo', fa);
+			typeList.addFactory('foo.bar', fb);
+			expect(typeList.removeFactory('foo.bar')).toBe(fb);
+			expect(typeList.getFactory('foo')).toBe(fa);
+		});
+
+	});
+
 	describe("factory priority", () => {
 
 		it("matches text before * wildcard", () => {
