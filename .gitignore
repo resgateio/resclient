@@ -2,6 +2,7 @@
 /coverage
 /package-lock.json
 /yarn.lock
+/*.log
 
 # Build files.
 /class

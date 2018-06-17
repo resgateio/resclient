@@ -3,17 +3,16 @@
   "version": "1.1.0",
   "description": "Client implementation of the RES-Client Protocol.",
   "scripts": {
-    "clean": "rimraf lib dist es coverage docs",
-    "build": "npm run build:commonjs && npm run build:umd && npm run build:umd:min && npm run build:es",
+    "clean": "rimraf lib dist es coverage docs && mkdir docs",
+    "build": "npm run clean && npm run build:commonjs && npm run build:es && npm run build:umd && npm run build:umd:min && npm run build:docs",
     "build:commonjs": "cross-env BABEL_ENV=commonjs babel src --out-dir lib",
     "build:es": "cross-env BABEL_ENV=es babel src --out-dir es",
-    "build:umd": "cross-env BABEL_ENV=es NODE_ENV=development node_modules/.bin/rollup src/index.js --format umd --name resclient --sourcemap --output dist/resclient.js",
-    "build:umd:min": "cross-env BABEL_ENV=es NODE_ENV=production rollup src/index.js --format umd --name resclient --output dist/resclient.min.js",
-    "docs": "jsdoc2md -f ./src/class/ResClient.js -f ./src/class/ResCollection.js -f ./src/class/ResModel.js -f ./src/def/eventCallback.js > ./docs/docs.md",
+    "build:umd": "cross-env BABEL_ENV=es NODE_ENV=development node_modules/.bin/rollup src/index.js --config --sourcemap --file dist/resclient.js",
+    "build:umd:min": "cross-env BABEL_ENV=es NODE_ENV=production rollup src/index.js --config --file dist/resclient.min.js",
+    "build:docs": "jsdoc2md -f ./src/class/ResClient.js -f ./src/class/ResCollection.js -f ./src/class/ResModel.js -f ./src/def/eventCallback.js > ./docs/docs.md",
     "eslint": "eslint src/**/*.js",
     "jest": "cross-env NODE_ENV=commonjs ./node_modules/.bin/jest src --coverage",
-    "test": "npm run eslint && npm run jest",
-    "prepare": "npm run clean && npm test && npm run build"
+    "test": "npm run eslint && npm run jest"
   },
   "repository": {
     "type": "git",
@@ -33,6 +32,7 @@
   ],
   "devDependencies": {
     "babel-cli": "^6.26.0",
+    "babel-plugin-external-helpers": "^6.22.0",
     "babel-preset-env": "^1.6.1",
     "cross-env": "^5.2.0",
     "eslint": "^4.19.1",
@@ -43,6 +43,7 @@
     "rollup": "^0.60.7",
     "rollup-plugin-babel": "^3.0.4",
     "rollup-plugin-commonjs": "^9.1.3",
+    "rollup-plugin-node-resolve": "^3.3.0",
     "rollup-plugin-uglify": "^4.0.0"
   },
   "dependencies": {

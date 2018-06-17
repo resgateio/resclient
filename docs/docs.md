@@ -15,6 +15,9 @@
 ## Typedefs
 
 <dl>
+<dt><a href="#resourceFactoryCallback">resourceFactoryCallback</a> : <code>function</code></dt>
+<dd><p>Resource factory callback</p>
+</dd>
 <dt><a href="#eventCallback">eventCallback</a> : <code>function</code></dt>
 <dd><p>Event callback</p>
 </dd>
@@ -35,10 +38,12 @@ ResClient is a client implementing the RES-Client protocol.
     * [.on(events, handler)](#ResClient+on)
     * [.off(events, [handler])](#ResClient+off)
     * [.setOnConnect(onConnect)](#ResClient+setOnConnect) ⇒ <code>this</code>
-    * [.registerModelType(modelType)](#ResClient+registerModelType)
-    * [.unregisterModelType(modelTypeId)](#ResClient+unregisterModelType) ⇒ <code>object</code>
+    * [.registerModelType(pattern, factory)](#ResClient+registerModelType)
+    * [.registerCollectionType(pattern, factory)](#ResClient+registerCollectionType)
     * [.getResource(rid, [collectionFactory])](#ResClient+getResource) ⇒ <code>Promise.&lt;(ResModel\|ResCollection)&gt;</code>
     * [.createModel(collectionId, props)](#ResClient+createModel) ⇒ [<code>Promise.&lt;ResModel&gt;</code>](#ResModel)
+    * [.setModel(modelId, props)](#ResClient+setModel) ⇒ <code>Promise.&lt;object&gt;</code>
+    * [.callResource(rid, method, params)](#ResClient+callResource) ⇒ <code>Promise.&lt;object&gt;</code>
 
 <a name="new_ResClient_new"></a>
 
@@ -113,26 +118,33 @@ Sets the onConnect callback.
 
 <a name="ResClient+registerModelType"></a>
 
-### resClient.registerModelType(modelType)
-Register a model type
+### resClient.registerModelType(pattern, factory)
+Register a model type.
+The pattern may use the following wild cards:
+* The asterisk (*) matches any part at any level of the resource name.
+* The greater than symbol (>) matches one or more parts at the end of a resource name, and must be the last part.
 
 **Kind**: instance method of [<code>ResClient</code>](#ResClient)  
 
 | Param | Type | Description |
 | --- | --- | --- |
-| modelType | [<code>ModelType</code>](#module/Api..ModelType) | Model type definition object |
+| pattern | <code>string</code> | Pattern of the model type. |
+| factory | [<code>resourceFactoryCallback</code>](#resourceFactoryCallback) | Model factory callback |
 
-<a name="ResClient+unregisterModelType"></a>
+<a name="ResClient+registerCollectionType"></a>
 
-### resClient.unregisterModelType(modelTypeId) ⇒ <code>object</code>
-Unregister a model type
+### resClient.registerCollectionType(pattern, factory)
+Register a collection type.
+The pattern may use the following wild cards:
+* The asterisk (*) matches any part at any level of the resource name.
+* The greater than symbol (>) matches one or more parts at the end of a resource name, and must be the last part.
 
 **Kind**: instance method of [<code>ResClient</code>](#ResClient)  
-**Returns**: <code>object</code> - Model type definition object, or null if it wasn't registered  
 
 | Param | Type | Description |
 | --- | --- | --- |
-| modelTypeId | <code>string</code> | Id of model type |
+| pattern | <code>string</code> | Pattern of the collection type. |
+| factory | <code>ResClient~resourceFactoryCallback</code> | Collection factory callback |
 
 <a name="ResClient+getResource"></a>
 
@@ -160,6 +172,33 @@ Create a new model resource
 | collectionId | <code>string</code> | Existing collection in which the resource is to be created |
 | props | <code>object</code> | Model properties |
 
+<a name="ResClient+setModel"></a>
+
+### resClient.setModel(modelId, props) ⇒ <code>Promise.&lt;object&gt;</code>
+Calls the set method to update model properties.
+
+**Kind**: instance method of [<code>ResClient</code>](#ResClient)  
+**Returns**: <code>Promise.&lt;object&gt;</code> - Promise of the call being completed.  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| modelId | <code>string</code> | Model resource ID. |
+| props | <code>object</code> | Properties. Set value to undefined to delete a property. |
+
+<a name="ResClient+callResource"></a>
+
+### resClient.callResource(rid, method, params) ⇒ <code>Promise.&lt;object&gt;</code>
+Calls a method on a resource.
+
+**Kind**: instance method of [<code>ResClient</code>](#ResClient)  
+**Returns**: <code>Promise.&lt;object&gt;</code> - Promise of the call result.  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| rid | <code>string</code> | Resource ID. |
+| method | <code>string</code> | Method name |
+| params | <code>\*</code> | Method parameters |
+
 <a name="ResCollection"></a>
 
 ## ResCollection
@@ -169,20 +208,22 @@ ResCollection represents a collection provided over the RES API.
 **Implements**: <code>module:modapp~Collection</code>  
 
 * [ResCollection](#ResCollection)
-    * [new ResCollection(api, rid, data, [opt])](#new_ResCollection_new)
+    * [new ResCollection(api, rid, [opt])](#new_ResCollection_new)
     * [.length](#ResCollection+length)
     * [.getResourceId()](#ResCollection+getResourceId) ⇒ <code>string</code>
     * [.on([events], [handler])](#ResCollection+on) ⇒ <code>this</code>
     * [.off([events], [handler])](#ResCollection+off) ⇒ <code>this</code>
     * [.get(id)](#ResCollection+get) ⇒ <code>\*</code>
-    * [.indexOf(id)](#ResCollection+indexOf) ⇒ <code>number</code>
-    * [.atIndex(idx)](#ResCollection+atIndex) ⇒ <code>module:modapp~Model</code>
+    * [.indexOf(item)](#ResCollection+indexOf) ⇒ <code>number</code>
+    * [.atIndex(idx)](#ResCollection+atIndex) ⇒ <code>\*</code>
     * [.create(props)](#ResCollection+create) ⇒ <code>Promise.&lt;Model&gt;</code>
     * [.remove(modelId)](#ResCollection+remove) ⇒ <code>Promise</code>
+    * [.call(method, params)](#ResCollection+call) ⇒ <code>Promise.&lt;object&gt;</code>
+    * [.toArray()](#ResCollection+toArray) ⇒ <code>Array.&lt;\*&gt;</code>
 
 <a name="new_ResCollection_new"></a>
 
-### new ResCollection(api, rid, data, [opt])
+### new ResCollection(api, rid, [opt])
 Creates an ResCollection instance
 
 
@@ -190,10 +231,8 @@ Creates an ResCollection instance
 | --- | --- | --- |
 | api | [<code>ResClient</code>](#ResClient) | ResClient instance |
 | rid | <code>string</code> | Resource id. |
-| data | <code>Array.&lt;object&gt;</code> | ResCollection data array |
 | [opt] | <code>object</code> | Optional settings |
-| [opt.compare] | <code>function</code> | Compare function for sort order. Defaults to insert order. |
-| [opt.idAttribute] | <code>function</code> | Id attribute callback function. Defaults to returning the object.id property. |
+| [opt.idCallback] | <code>function</code> | Id callback function. |
 
 <a name="ResCollection+length"></a>
 
@@ -214,7 +253,7 @@ Collection resource ID
 Attach a collection event handler function for one or more events.
 If no event or handler is provided, the collection will still be considered listened to,
 until a matching off call without arguments is made.
-Available events are 'add', 'remove', and 'move'.
+Available events are 'add' and 'remove'.
 
 **Kind**: instance method of [<code>ResCollection</code>](#ResCollection)  
 
@@ -227,7 +266,7 @@ Available events are 'add', 'remove', and 'move'.
 
 ### resCollection.off([events], [handler]) ⇒ <code>this</code>
 Remove a collection event handler function.
-Available events are 'add', 'remove', and 'move'.
+Available events are 'add' and 'remove'.
 
 **Kind**: instance method of [<code>ResCollection</code>](#ResCollection)  
 
@@ -239,44 +278,45 @@ Available events are 'add', 'remove', and 'move'.
 <a name="ResCollection+get"></a>
 
 ### resCollection.get(id) ⇒ <code>\*</code>
-Get a model from the collection by id
+Get an item from the collection by id.
+Requires that id callback is defined for the collection.
 
 **Kind**: instance method of [<code>ResCollection</code>](#ResCollection)  
-**Returns**: <code>\*</code> - Stored model. Undefined if key doesn't exist  
+**Returns**: <code>\*</code> - Item with the id. Undefined if key doesn't exist  
 
 | Param | Type | Description |
 | --- | --- | --- |
-| id | <code>string</code> | Id of the model |
+| id | <code>string</code> | Id of the item |
 
 <a name="ResCollection+indexOf"></a>
 
-### resCollection.indexOf(id) ⇒ <code>number</code>
-Retrieves the order index of a model.
+### resCollection.indexOf(item) ⇒ <code>number</code>
+Retrieves the order index of an item.
 
 **Kind**: instance method of [<code>ResCollection</code>](#ResCollection)  
-**Returns**: <code>number</code> - Order index of the model. -1 if the model id doesn't exist.  
+**Returns**: <code>number</code> - Order index of the first matching item. -1 if the item doesn't exist.  
 
 | Param | Type | Description |
 | --- | --- | --- |
-| id | <code>string</code> \| <code>Model</code> | Id of the model or the model object |
+| item | <code>\*</code> | Item to find |
 
 <a name="ResCollection+atIndex"></a>
 
-### resCollection.atIndex(idx) ⇒ <code>module:modapp~Model</code>
-Gets a model from the collection by index position
+### resCollection.atIndex(idx) ⇒ <code>\*</code>
+Gets an item from the collection by index position
 
 **Kind**: instance method of [<code>ResCollection</code>](#ResCollection)  
-**Returns**: <code>module:modapp~Model</code> - Stored model. Undefined if the index is out of bounds.  
+**Returns**: <code>\*</code> - Item at the given index. Undefined if the index is out of bounds.  
 
 | Param | Type | Description |
 | --- | --- | --- |
-| idx | <code>number</code> | Index of the model |
+| idx | <code>number</code> | Index of the item |
 
 <a name="ResCollection+create"></a>
 
 ### resCollection.create(props) ⇒ <code>Promise.&lt;Model&gt;</code>
 Creates a new model for the collection at the server.
-Server will return an error if the collection doesn't support creation.
+Server will return an error if the collection doesn't support model creation.
 
 **Kind**: instance method of [<code>ResCollection</code>](#ResCollection)  
 **Returns**: <code>Promise.&lt;Model&gt;</code> - Promise of the created model.  
@@ -289,7 +329,7 @@ Server will return an error if the collection doesn't support creation.
 
 ### resCollection.remove(modelId) ⇒ <code>Promise</code>
 Removes an existing model from the collection at the server.
-Server will return an error if the collection doesn't support removal.
+Server will return an error if the collection doesn't support model deletion.
 
 **Kind**: instance method of [<code>ResCollection</code>](#ResCollection)  
 **Returns**: <code>Promise</code> - Promise of the removal.  
@@ -298,6 +338,26 @@ Server will return an error if the collection doesn't support removal.
 | --- | --- | --- |
 | modelId | <code>string</code> | Model resource id |
 
+<a name="ResCollection+call"></a>
+
+### resCollection.call(method, params) ⇒ <code>Promise.&lt;object&gt;</code>
+Calls a method on the collection.
+
+**Kind**: instance method of [<code>ResCollection</code>](#ResCollection)  
+**Returns**: <code>Promise.&lt;object&gt;</code> - Promise of the call result.  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| method | <code>string</code> | Method name |
+| params | <code>\*</code> | Method parameters |
+
+<a name="ResCollection+toArray"></a>
+
+### resCollection.toArray() ⇒ <code>Array.&lt;\*&gt;</code>
+Returns a shallow clone of the internal array.
+
+**Kind**: instance method of [<code>ResCollection</code>](#ResCollection)  
+**Returns**: <code>Array.&lt;\*&gt;</code> - Clone of internal array  
 <a name="ResModel"></a>
 
 ## ResModel
@@ -307,7 +367,7 @@ ResModel represents a model provided over the RES API.
 **Implements**: <code>module:modapp~Model</code>  
 
 * [ResModel](#ResModel)
-    * [new ResModel(api, rid, data, [opt])](#new_ResModel_new)
+    * [new ResModel(api, rid, [opt])](#new_ResModel_new)
     * [.getResourceId()](#ResModel+getResourceId) ⇒ <code>string</code>
     * [.on([events], [handler])](#ResModel+on) ⇒ <code>this</code>
     * [.off(events, [handler])](#ResModel+off) ⇒ <code>this</code>
@@ -316,7 +376,7 @@ ResModel represents a model provided over the RES API.
 
 <a name="new_ResModel_new"></a>
 
-### new ResModel(api, rid, data, [opt])
+### new ResModel(api, rid, [opt])
 Creates a ResModel instance
 
 
@@ -324,7 +384,6 @@ Creates a ResModel instance
 | --- | --- | --- |
 | api | [<code>ResClient</code>](#ResClient) | ResClient instance |
 | rid | <code>string</code> | Resource id. |
-| data | <code>object</code> | Data object |
 | [opt] | <code>object</code> | Optional parameters. |
 | [opt.definition] | <code>object</code> | Object definition. If not provided, any value will be allowed. |
 
@@ -373,7 +432,7 @@ Calls the set method to update model properties.
 
 | Param | Type | Description |
 | --- | --- | --- |
-| props | <code>object</code> | Properties |
+| props | <code>object</code> | Properties. Set value to undefined to delete a property. |
 
 <a name="ResModel+call"></a>
 
@@ -387,6 +446,18 @@ Calls a method on the model.
 | --- | --- | --- |
 | method | <code>string</code> | Method name |
 | params | <code>\*</code> | Method parameters |
+
+<a name="resourceFactoryCallback"></a>
+
+## resourceFactoryCallback : <code>function</code>
+Resource factory callback
+
+**Kind**: global typedef  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| api | [<code>ResClient</code>](#ResClient) | ResClient instance |
+| rid | <code>string</code> | Resource ID |
 
 <a name="eventCallback"></a>
 
