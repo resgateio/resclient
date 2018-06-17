@@ -24,7 +24,7 @@ import ResClient from 'resclient';
 
 const client = new ResClient('ws://localhost:8080/ws');
 
-client.getResource('exampleService.myModel').then(model => {
+client.get('exampleService.myModel').then(model => {
 	alert(model.message);
 
 	// Listen to changes for 5 seconds, eventually unsubscribing

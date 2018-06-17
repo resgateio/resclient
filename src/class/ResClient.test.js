@@ -146,7 +146,7 @@ describe("ResClient", () => {
 	}
 
 	function getServerResource(rid, data, collectionFactory) {
-		let promise = client.getResource(rid, collectionFactory);
+		let promise = client.get(rid, collectionFactory);
 
 		return flushRequests().then(() => {
 			expect(server.error).toBe(null);
@@ -189,7 +189,7 @@ describe("ResClient", () => {
 		});
 
 		it("connects on getResource", () => {
-			client.getResource('service.test');
+			client.get('service.test');
 
 			return flushPromises().then(() => {
 				expect(server.isConnected()).toBe(true);
@@ -210,7 +210,7 @@ describe("ResClient", () => {
 	describe("getResource model", () => {
 
 		it("gets model resource from server", () => {
-			let promise = client.getResource('service.model').then(model => {
+			let promise = client.get('service.model').then(model => {
 				expect(model.foo).toBe("bar");
 			});
 
@@ -231,7 +231,7 @@ describe("ResClient", () => {
 		it("gets model resource from cache on second request", () => {
 			return getServerResource('service.model', modelResources).then(model => {
 				expect(model.foo).toBe("bar");
-				return client.getResource('service.model').then(modelSecond => {
+				return client.get('service.model').then(modelSecond => {
 					expect(model).toBe(modelSecond);
 
 					return flushRequests().then(() => {
@@ -268,7 +268,7 @@ describe("ResClient", () => {
 		});
 
 		it("rejects the promise on error", () => {
-			let promise = client.getResource('service.model');
+			let promise = client.get('service.model');
 
 			return flushRequests().then(() => {
 				let req = server.getNextRequest();
@@ -288,7 +288,7 @@ describe("ResClient", () => {
 	describe("getResource collection", () => {
 
 		it("gets primitive collection resource from server", () => {
-			let promise = client.getResource('service.primitives').then(collection => {
+			let promise = client.get('service.primitives').then(collection => {
 				expect(server.error).toBe(null);
 				expect(server.pendingRequests()).toBe(0);
 
@@ -311,7 +311,7 @@ describe("ResClient", () => {
 		});
 
 		it("gets model collection resource from server", () => {
-			let promise = client.getResource('service.collection').then(collection => {
+			let promise = client.get('service.collection').then(collection => {
 				expect(server.error).toBe(null);
 				expect(server.pendingRequests()).toBe(0);
 
@@ -334,11 +334,11 @@ describe("ResClient", () => {
 		it("gets model collection resource and collection models from cache on second request", () => {
 			return getServerResource('service.collection', collectionResources).then(collection => {
 				expect(collection.atIndex(0).name).toBe("Ten");
-				return client.getResource('service.collection').then(collectionSecond => {
+				return client.get('service.collection').then(collectionSecond => {
 					expect(collection).toBe(collectionSecond);
 
 					// Test that collection models are also taken from cache
-					return client.getResource(collectionData[0].rid).then(model => {
+					return client.get(collectionData[0].rid).then(model => {
 						expect(model.name).toBe("Ten");
 
 						return flushRequests().then(() => {
@@ -684,7 +684,7 @@ describe("ResClient", () => {
 						expect(server.error).toBe(null);
 
 						// Get model from cache
-						return client.getResource(collectionData[0].rid).then(modelSecond => {
+						return client.get(collectionData[0].rid).then(modelSecond => {
 							expect(model).toBe(modelSecond);
 
 							return flushRequests().then(() => {
@@ -1058,10 +1058,10 @@ describe("ResClient", () => {
 		});
 
 		it("postpones any request until setOnConnect callback resolves", () => {
-			let onConnect = jest.fn(() => client.callResource('service.model', 'test'));
+			let onConnect = jest.fn(() => client.call('service.model', 'test'));
 			client.setOnConnect(onConnect);
 
-			let promise = client.getResource('service.model');
+			let promise = client.get('service.model');
 
 			return flushRequests().then(() => {
 				expect(server.pendingRequests()).toBe(1);
@@ -1254,28 +1254,6 @@ describe("ResClient", () => {
 	});
 
 	describe("ResCollection", () => {
-
-		it("calls new method on create", () => {
-			return getServerResource('service.collection', collectionResources).then(collection => {
-				collection.create({ foo: "baz" });
-				return flushRequests().then(() => {
-					let req = server.getNextRequest();
-					expect(req.method).toBe('call.service.collection.new');
-					expect(req.params).toEqual({ foo: "baz" });
-				});
-			});
-		});
-
-		it("calls remove method on remove", () => {
-			return getServerResource('service.collection', collectionResources).then(collection => {
-				collection.remove('service.item.10');
-				return flushRequests().then(() => {
-					let req = server.getNextRequest();
-					expect(req.method).toBe('call.service.collection.remove');
-					expect(req.params).toEqual({ rid: 'service.item.10' });
-				});
-			});
-		});
 
 		it("getResourceId returns the collection resource ID", () => {
 			return getServerResource('service.collection', collectionResources).then(collection => {
