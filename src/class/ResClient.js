@@ -237,17 +237,13 @@ class ResClient {
 		return this.types.model.list.removeFactory(pattern);
 	}
 
-	unregisterCollectionType(pattern) {
-		return this.types.model.list.removeFactory(pattern);
-	}
-
 	/**
 	 * Get a resource from the backend
 	 * @param {string} rid Resource ID
 	 * @param {function} [collectionFactory] Collection factory function.
 	 * @return {Promise.<(ResModel|ResCollection)>} Promise of the resourcce
 	 */
-	getResource(rid) {
+	get(rid) {
 		// Check for resource in cache
 		let ci = this.cache[rid];
 		if (ci) {
@@ -263,21 +259,25 @@ class ResClient {
 	}
 
 	/**
-	 * Create a new model resource
-	 * @param {string} collectionId Existing collection in which the resource is to be created
-	 * @param {?object} props Model properties
-	 * @returns {Promise.<ResModel>} Promise of the created model
+	 * Calls a method on a resource.
+	 * @param {string} rid Resource ID.
+	 * @param {string} method Method name
+	 * @param {*} params Method parameters
+	 * @returns {Promise.<object>} Promise of the call result.
 	 */
-	createModel(collectionId, props) {
-		return this._send('call.' + collectionId + '.new', props).then(response => {
-			let cacheModel = this._getCachedModel(response.rid, response.data);
-			cacheModel.setSubscribed(true);
-			return cacheModel.item;
-		});
+	call(rid, method, params) {
+		return this._send('call.' + rid + '.' + method, params);
 	}
 
-	removeModel(collectionId, rid) {
-		return this._send('call.' + collectionId + '.remove', { rid });
+	/**
+	 * Invokes a authentication method on a resource.
+	 * @param {string} rid Resource ID.
+	 * @param {string} method Method name
+	 * @param {*} params Method parameters
+	 * @returns {Promise.<object>} Promise of the authentication result.
+	 */
+	authenticate(rid, method, params) {
+		return this._send('auth.' + rid + '.' + method, params);
 	}
 
 	/**
@@ -296,21 +296,6 @@ class ResClient {
 		});
 
 		return this._send('call.' + modelId + '.set', props);
-	}
-
-	/**
-	 * Calls a method on a resource.
-	 * @param {string} rid Resource ID.
-	 * @param {string} method Method name
-	 * @param {*} params Method parameters
-	 * @returns {Promise.<object>} Promise of the call result.
-	 */
-	callResource(rid, method, params) {
-		return this._send('call.' + rid + '.' + method, params);
-	}
-
-	authenticate(rid, method, params) {
-		return this._send('auth.' + rid + '.' + method, params);
 	}
 
 	resourceOn(rid, events, handler) {

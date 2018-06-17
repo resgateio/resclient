@@ -42,10 +42,10 @@ ResClient is a client implementing the RES-Client protocol.
     * [.unregisterModelType(pattern)](#ResClient+unregisterModelType) ⇒ [<code>resourceFactoryCallback</code>](#resourceFactoryCallback)
     * [.registerCollectionType(pattern, factory)](#ResClient+registerCollectionType)
     * [.unregisterCollectionType(pattern)](#ResClient+unregisterCollectionType) ⇒ [<code>resourceFactoryCallback</code>](#resourceFactoryCallback)
-    * [.getResource(rid, [collectionFactory])](#ResClient+getResource) ⇒ <code>Promise.&lt;(ResModel\|ResCollection)&gt;</code>
-    * [.createModel(collectionId, props)](#ResClient+createModel) ⇒ [<code>Promise.&lt;ResModel&gt;</code>](#ResModel)
+    * [.get(rid, [collectionFactory])](#ResClient+get) ⇒ <code>Promise.&lt;(ResModel\|ResCollection)&gt;</code>
+    * [.call(rid, method, params)](#ResClient+call) ⇒ <code>Promise.&lt;object&gt;</code>
+    * [.authenticate(rid, method, params)](#ResClient+authenticate) ⇒ <code>Promise.&lt;object&gt;</code>
     * [.setModel(modelId, props)](#ResClient+setModel) ⇒ <code>Promise.&lt;object&gt;</code>
-    * [.callResource(rid, method, params)](#ResClient+callResource) ⇒ <code>Promise.&lt;object&gt;</code>
 
 <a name="new_ResClient_new"></a>
 
@@ -172,9 +172,9 @@ Unregister a previously registered collection type pattern.
 | --- | --- | --- |
 | pattern | <code>string</code> | Pattern of the collection type. |
 
-<a name="ResClient+getResource"></a>
+<a name="ResClient+get"></a>
 
-### resClient.getResource(rid, [collectionFactory]) ⇒ <code>Promise.&lt;(ResModel\|ResCollection)&gt;</code>
+### resClient.get(rid, [collectionFactory]) ⇒ <code>Promise.&lt;(ResModel\|ResCollection)&gt;</code>
 Get a resource from the backend
 
 **Kind**: instance method of [<code>ResClient</code>](#ResClient)  
@@ -185,18 +185,33 @@ Get a resource from the backend
 | rid | <code>string</code> | Resource ID |
 | [collectionFactory] | <code>function</code> | Collection factory function. |
 
-<a name="ResClient+createModel"></a>
+<a name="ResClient+call"></a>
 
-### resClient.createModel(collectionId, props) ⇒ [<code>Promise.&lt;ResModel&gt;</code>](#ResModel)
-Create a new model resource
+### resClient.call(rid, method, params) ⇒ <code>Promise.&lt;object&gt;</code>
+Calls a method on a resource.
 
 **Kind**: instance method of [<code>ResClient</code>](#ResClient)  
-**Returns**: [<code>Promise.&lt;ResModel&gt;</code>](#ResModel) - Promise of the created model  
+**Returns**: <code>Promise.&lt;object&gt;</code> - Promise of the call result.  
 
 | Param | Type | Description |
 | --- | --- | --- |
-| collectionId | <code>string</code> | Existing collection in which the resource is to be created |
-| props | <code>object</code> | Model properties |
+| rid | <code>string</code> | Resource ID. |
+| method | <code>string</code> | Method name |
+| params | <code>\*</code> | Method parameters |
+
+<a name="ResClient+authenticate"></a>
+
+### resClient.authenticate(rid, method, params) ⇒ <code>Promise.&lt;object&gt;</code>
+Invokes a authentication method on a resource.
+
+**Kind**: instance method of [<code>ResClient</code>](#ResClient)  
+**Returns**: <code>Promise.&lt;object&gt;</code> - Promise of the authentication result.  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| rid | <code>string</code> | Resource ID. |
+| method | <code>string</code> | Method name |
+| params | <code>\*</code> | Method parameters |
 
 <a name="ResClient+setModel"></a>
 
@@ -210,20 +225,6 @@ Calls the set method to update model properties.
 | --- | --- | --- |
 | modelId | <code>string</code> | Model resource ID. |
 | props | <code>object</code> | Properties. Set value to undefined to delete a property. |
-
-<a name="ResClient+callResource"></a>
-
-### resClient.callResource(rid, method, params) ⇒ <code>Promise.&lt;object&gt;</code>
-Calls a method on a resource.
-
-**Kind**: instance method of [<code>ResClient</code>](#ResClient)  
-**Returns**: <code>Promise.&lt;object&gt;</code> - Promise of the call result.  
-
-| Param | Type | Description |
-| --- | --- | --- |
-| rid | <code>string</code> | Resource ID. |
-| method | <code>string</code> | Method name |
-| params | <code>\*</code> | Method parameters |
 
 <a name="ResCollection"></a>
 
@@ -242,8 +243,6 @@ ResCollection represents a collection provided over the RES API.
     * [.get(id)](#ResCollection+get) ⇒ <code>\*</code>
     * [.indexOf(item)](#ResCollection+indexOf) ⇒ <code>number</code>
     * [.atIndex(idx)](#ResCollection+atIndex) ⇒ <code>\*</code>
-    * [.create(props)](#ResCollection+create) ⇒ <code>Promise.&lt;Model&gt;</code>
-    * [.remove(modelId)](#ResCollection+remove) ⇒ <code>Promise</code>
     * [.call(method, params)](#ResCollection+call) ⇒ <code>Promise.&lt;object&gt;</code>
     * [.toArray()](#ResCollection+toArray) ⇒ <code>Array.&lt;\*&gt;</code>
 
@@ -337,32 +336,6 @@ Gets an item from the collection by index position
 | Param | Type | Description |
 | --- | --- | --- |
 | idx | <code>number</code> | Index of the item |
-
-<a name="ResCollection+create"></a>
-
-### resCollection.create(props) ⇒ <code>Promise.&lt;Model&gt;</code>
-Creates a new model for the collection at the server.
-Server will return an error if the collection doesn't support model creation.
-
-**Kind**: instance method of [<code>ResCollection</code>](#ResCollection)  
-**Returns**: <code>Promise.&lt;Model&gt;</code> - Promise of the created model.  
-
-| Param | Type | Description |
-| --- | --- | --- |
-| props | <code>object</code> | Model properties |
-
-<a name="ResCollection+remove"></a>
-
-### resCollection.remove(modelId) ⇒ <code>Promise</code>
-Removes an existing model from the collection at the server.
-Server will return an error if the collection doesn't support model deletion.
-
-**Kind**: instance method of [<code>ResCollection</code>](#ResCollection)  
-**Returns**: <code>Promise</code> - Promise of the removal.  
-
-| Param | Type | Description |
-| --- | --- | --- |
-| modelId | <code>string</code> | Model resource id |
 
 <a name="ResCollection+call"></a>
 
