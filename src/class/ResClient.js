@@ -241,7 +241,7 @@ class ResClient {
 	 * Get a resource from the backend
 	 * @param {string} rid Resource ID
 	 * @param {function} [collectionFactory] Collection factory function.
-	 * @return {Promise.<(ResModel|ResCollection)>} Promise of the resourcce
+	 * @return {Promise.<(ResModel|ResCollection)>} Promise of the resource.
 	 */
 	get(rid) {
 		// Check for resource in cache
@@ -278,6 +278,22 @@ class ResClient {
 	 */
 	authenticate(rid, method, params) {
 		return this._send('auth.' + rid + '.' + method, params);
+	}
+
+	/**
+	 * Creates a new resource by calling the 'new' method.
+	 * @param {*} rid Resource ID
+	 * @param {*} params Method parameters
+	 * @return {Promise.<(ResModel|ResCollection)>} Promise of the resource.
+	 */
+	create(rid, params) {
+		return this._send('new.' + rid, params)
+			.then(response => {
+				this._cacheResources(response);
+				let ci = this.cache[v.rid];
+				ci.setSubscribed(true);
+				return ci.item;
+			});
 	}
 
 	/**
