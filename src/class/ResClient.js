@@ -290,7 +290,7 @@ class ResClient {
 		return this._send('new.' + rid, params)
 			.then(response => {
 				this._cacheResources(response);
-				let ci = this.cache[v.rid];
+				let ci = this.cache[response.rid];
 				ci.setSubscribed(true);
 				return ci.item;
 			});
