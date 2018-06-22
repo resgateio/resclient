@@ -1,4 +1,7 @@
-export default class ResError {
+/**
+ * ResError represents a RES API error.
+ */
+class ResError {
 
 	constructor(rid, method, params) {
 		this.rid = rid;
@@ -9,12 +12,42 @@ export default class ResError {
 	}
 
 	__init(err) {
-		this.code = err.code || 'system.unknownError';
-		this.message = err.message || `Unknown error`;
-		this.data = err.data;
+		this._code = err.code || 'system.unknownError';
+		this._message = err.message || `Unknown error`;
+		this._data = err.data;
 	}
 
+	/**
+	 * Error code
+	 * @type {string}
+	 */
+	get code() {
+		return this._code;
+	}
+
+	/**
+	 * Error message
+	 * @type {string}
+	 */
+	get message() {
+		return this._message;
+	}
+
+	/**
+	 * Error data object
+	 * @type {*}
+	 */
+	get data() {
+		return this._data;
+	}
+
+	/**
+	 * Error resource ID
+	 * @returns {string} Resource ID
+	 */
 	getResourceId() {
 		return this.rid;
 	}
 }
+
+export default ResError;

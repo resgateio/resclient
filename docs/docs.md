@@ -10,6 +10,9 @@
 <dt><a href="#ResModel">ResModel</a></dt>
 <dd><p>ResModel represents a model provided over the RES API.</p>
 </dd>
+<dt><a href="#ResError">ResError</a></dt>
+<dd><p>ResError represents a RES API error.</p>
+</dd>
 </dl>
 
 ## Typedefs
@@ -45,6 +48,7 @@ ResClient is a client implementing the RES-Client protocol.
     * [.get(rid, [collectionFactory])](#ResClient+get) ⇒ <code>Promise.&lt;(ResModel\|ResCollection)&gt;</code>
     * [.call(rid, method, params)](#ResClient+call) ⇒ <code>Promise.&lt;object&gt;</code>
     * [.authenticate(rid, method, params)](#ResClient+authenticate) ⇒ <code>Promise.&lt;object&gt;</code>
+    * [.create(rid, params)](#ResClient+create) ⇒ <code>Promise.&lt;(ResModel\|ResCollection)&gt;</code>
     * [.setModel(modelId, props)](#ResClient+setModel) ⇒ <code>Promise.&lt;object&gt;</code>
 
 <a name="new_ResClient_new"></a>
@@ -175,10 +179,10 @@ Unregister a previously registered collection type pattern.
 <a name="ResClient+get"></a>
 
 ### resClient.get(rid, [collectionFactory]) ⇒ <code>Promise.&lt;(ResModel\|ResCollection)&gt;</code>
-Get a resource from the backend
+Get a resource from the API
 
 **Kind**: instance method of [<code>ResClient</code>](#ResClient)  
-**Returns**: <code>Promise.&lt;(ResModel\|ResCollection)&gt;</code> - Promise of the resourcce  
+**Returns**: <code>Promise.&lt;(ResModel\|ResCollection)&gt;</code> - Promise of the resource.  
 
 | Param | Type | Description |
 | --- | --- | --- |
@@ -211,6 +215,19 @@ Invokes a authentication method on a resource.
 | --- | --- | --- |
 | rid | <code>string</code> | Resource ID. |
 | method | <code>string</code> | Method name |
+| params | <code>\*</code> | Method parameters |
+
+<a name="ResClient+create"></a>
+
+### resClient.create(rid, params) ⇒ <code>Promise.&lt;(ResModel\|ResCollection)&gt;</code>
+Creates a new resource by calling the 'new' method.
+
+**Kind**: instance method of [<code>ResClient</code>](#ResClient)  
+**Returns**: <code>Promise.&lt;(ResModel\|ResCollection)&gt;</code> - Promise of the resource.  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| rid | <code>\*</code> | Resource ID |
 | params | <code>\*</code> | Method parameters |
 
 <a name="ResClient+setModel"></a>
@@ -446,6 +463,44 @@ Calls a method on the model.
 | method | <code>string</code> | Method name |
 | params | <code>\*</code> | Method parameters |
 
+<a name="ResError"></a>
+
+## ResError
+ResError represents a RES API error.
+
+**Kind**: global class  
+
+* [ResError](#ResError)
+    * [.code](#ResError+code) : <code>string</code>
+    * [.message](#ResError+message) : <code>string</code>
+    * [.data](#ResError+data) : <code>\*</code>
+    * [.getResourceId()](#ResError+getResourceId) ⇒ <code>string</code>
+
+<a name="ResError+code"></a>
+
+### resError.code : <code>string</code>
+Error code
+
+**Kind**: instance property of [<code>ResError</code>](#ResError)  
+<a name="ResError+message"></a>
+
+### resError.message : <code>string</code>
+Error message
+
+**Kind**: instance property of [<code>ResError</code>](#ResError)  
+<a name="ResError+data"></a>
+
+### resError.data : <code>\*</code>
+Error data object
+
+**Kind**: instance property of [<code>ResError</code>](#ResError)  
+<a name="ResError+getResourceId"></a>
+
+### resError.getResourceId() ⇒ <code>string</code>
+Error resource ID
+
+**Kind**: instance method of [<code>ResError</code>](#ResError)  
+**Returns**: <code>string</code> - Resource ID  
 <a name="resourceFactoryCallback"></a>
 
 ## resourceFactoryCallback : <code>function</code>

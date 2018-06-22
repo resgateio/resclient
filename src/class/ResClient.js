@@ -238,7 +238,7 @@ class ResClient {
 	}
 
 	/**
-	 * Get a resource from the backend
+	 * Get a resource from the API
 	 * @param {string} rid Resource ID
 	 * @param {function} [collectionFactory] Collection factory function.
 	 * @return {Promise.<(ResModel|ResCollection)>} Promise of the resource.
@@ -317,7 +317,7 @@ class ResClient {
 	resourceOn(rid, events, handler) {
 		let cacheItem = this.cache[rid];
 		if (!cacheItem) {
-			throw new Error("Resource not found in cache: " + rid);
+			throw new Error("Resource not found in cache");
 		}
 
 		cacheItem.addDirect();
@@ -335,7 +335,7 @@ class ResClient {
 	}
 
 	/**
-	 * Sends a JsonRpc call to the server
+	 * Sends a JsonRpc call to the API
 	 * @param {object} method Method name
 	 * @param {object} params Method parameters
 	 * @returns {Promise.<object>} Promise to the response
