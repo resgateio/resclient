@@ -1,6 +1,6 @@
 
 import { eventBus } from 'modapp';
-import * as obj from 'modapp-utils/obj';
+import { obj } from 'modapp-utils';
 import CacheItem from './CacheItem';
 import TypeList from './TypeList';
 import ResCollection from './ResCollection';

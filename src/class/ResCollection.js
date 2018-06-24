@@ -1,4 +1,4 @@
-import * as obj from 'modapp-utils/obj';
+import { obj } from 'modapp-utils';
 
 /**
  * ResCollection represents a collection provided over the RES API.
