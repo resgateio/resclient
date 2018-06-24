@@ -2,6 +2,15 @@
   "name": "resclient",
   "version": "1.1.0",
   "description": "Client implementation of the RES-Client Protocol.",
+  "main": "lib/index.js",
+  "module": "es/index.js",
+  "jsnext:main": "es/index.js",
+  "files": [
+    "dist",
+    "lib",
+    "es",
+    "src"
+  ],
   "scripts": {
     "clean": "rimraf lib dist es coverage docs && mkdir docs",
     "build": "npm run clean && npm run build:commonjs && npm run build:es && npm run build:umd && npm run build:umd:min && npm run build:docs",
@@ -21,15 +30,6 @@
   "author": "Samuel Jirénius <samuel@jirenius.com>",
   "license": "MIT",
   "homepage": "https://github.com/jirenius/resclient",
-  "main": "lib/index.js",
-  "module": "es/index.js",
-  "jsnext:main": "es/index.js",
-  "files": [
-    "dist",
-    "lib",
-    "es",
-    "src"
-  ],
   "devDependencies": {
     "babel-cli": "^6.26.0",
     "babel-jest": "^23.0.1",
