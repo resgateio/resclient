@@ -34,10 +34,10 @@
     "babel-cli": "^6.26.0",
     "babel-jest": "^23.0.1",
     "babel-plugin-external-helpers": "^6.22.0",
-    "babel-preset-env": "^1.6.1",
+    "babel-preset-env": "^1.7.0",
     "cross-env": "^5.2.0",
     "eslint": "^4.19.1",
-    "jest": "^22.4.3",
+    "jest": "^22.4.4",
     "jsdoc-to-markdown": "^4.0.1",
     "mock-socket": "^7.1.0",
     "rimraf": "^2.6.2",
@@ -48,7 +48,7 @@
     "rollup-plugin-uglify": "^4.0.0"
   },
   "dependencies": {
-    "modapp": "^2.2.0",
-    "modapp-utils": "^1.1.0"
+    "modapp": "^2.3.0",
+    "modapp-utils": "^1.2.0"
   }
 }
