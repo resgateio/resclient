@@ -1,5 +1,5 @@
 
-import eventBus from 'modapp/eventBus';
+import { eventBus } from 'modapp';
 import * as obj from 'modapp-utils/obj';
 import CacheItem from './CacheItem';
 import TypeList from './TypeList';
@@ -45,7 +45,7 @@ class ResClient {
 	 * @param {object} [opt] Optional parameters.
 	 * @param {function} [opt.onConnect] On connect callback called prior resolving the connect promise and subscribing to stale resources. May return a promise.
 	 * @param {string} [opt.namespace] Event bus namespace. Defaults to 'resclient'.
-	 * @param {module:modapp/ext~EventBus} [opt.eventBus] Event bus.
+	 * @param {module:modapp~EventBus} [opt.eventBus] Event bus.
 	 */
 	constructor(hostUrl, opt) {
 		this.hostUrl = this._resolvePath(hostUrl);
