@@ -694,6 +694,14 @@ class ResClient {
 			this._emit('close', e);
 		}
 
+		let hasStale = false;
+		for (let _ in this.cache) { // eslint-disable-line no-unused-vars
+			hasStale = true;
+			break;
+		}
+
+		this.tryConnect = hasStale && this.tryConnect;
+
 		if (this.tryConnect) {
 			this._reconnect();
 		}
@@ -1008,7 +1016,10 @@ class ResClient {
 		while (s < m && s < n && a[s] === b[s]) {
 			s++;
 		}
-		while (s <= m && s <= n && a[m - 1] === b[n - 1]) {
+		if (s === m && s === n) {
+			return;
+		}
+		while (s < m && s < n && a[m - 1] === b[n - 1]) {
 			m--;
 			n--;
 		}
