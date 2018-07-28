@@ -148,7 +148,7 @@ class ResClient {
 
 		if (this.ws) {
 			this.ws.close();
-			this._connectReject(new Error("Disconnect called"));
+			this._connectReject({ code: 'system.disconnect', message: "Disconnect called" });
 		}
 	}
 
@@ -266,7 +266,7 @@ class ResClient {
 	 * @returns {Promise.<object>} Promise of the call result.
 	 */
 	call(rid, method, params) {
-		return this._send('call.' + rid + '.' + method, params);
+		return this._send('call', rid, method || '', params);
 	}
 
 	/**
@@ -277,7 +277,7 @@ class ResClient {
 	 * @returns {Promise.<object>} Promise of the authentication result.
 	 */
 	authenticate(rid, method, params) {
-		return this._send('auth.' + rid + '.' + method, params);
+		return this._send('auth', rid, method || '', params);
 	}
 
 	/**
@@ -287,7 +287,7 @@ class ResClient {
 	 * @return {Promise.<(ResModel|ResCollection)>} Promise of the resource.
 	 */
 	create(rid, params) {
-		return this._send('new.' + rid, params)
+		return this._send('new', rid, null, params)
 			.then(response => {
 				this._cacheResources(response);
 				let ci = this.cache[response.rid];
@@ -311,7 +311,7 @@ class ResClient {
 			}
 		});
 
-		return this._send('call.' + modelId + '.set', props);
+		return this._send('call', modelId, 'set', props);
 	}
 
 	resourceOn(rid, events, handler) {
@@ -336,15 +336,29 @@ class ResClient {
 
 	/**
 	 * Sends a JsonRpc call to the API
-	 * @param {object} method Method name
-	 * @param {object} params Method parameters
+	 * @param {string} action Action name
+	 * @param {string} rid Resource ID
+	 * @param {?string} method Optional method name
+	 * @param {?object} params Optional parameters
 	 * @returns {Promise.<object>} Promise to the response
 	 * @private
 	 */
-	_send(method, params) {
+	_send(action, rid, method, params) {
+		if (!rid) {
+			throw new Error("Invalid resource ID");
+		}
+
+		if (method === "") {
+			throw new Error("Invalid method");
+		}
+
+		let m = action + '.' + rid + (method ? '.' + method : '');
+
 		return this.connected
-			? this._sendNow(method, params)
-			: this.connect().then(() => this._sendNow(method, params));
+			? this._sendNow(m, params)
+			: this.connect()
+				.catch(e => { throw new ResError(rid, m, params).__init(e); })
+				.then(() => this._sendNow(m, params));
 	}
 
 	_sendNow(method, params) {
@@ -603,7 +617,7 @@ class ResClient {
 		let rid = ci.rid;
 		ci.setSubscribed(true);
 		this._removeStale(rid);
-		return this._send('subscribe.' + rid)
+		return this._send('subscribe', rid)
 			.then(response => this._cacheResources(response))
 			.catch(err => {
 				this._handleFailedSubscribe(ci);
@@ -658,7 +672,7 @@ class ResClient {
 	 * @private
 	 */
 	_handleOnerror(e) {
-		this._connectReject(e);
+		this._connectReject({ code: 'system.connectionError', message: "Connection error", data: e });
 	}
 
 	/**
@@ -1104,7 +1118,7 @@ class ResClient {
 
 		this._subscribeReferred(ci);
 
-		this._send('unsubscribe.' + ci.rid)
+		this._send('unsubscribe', ci.rid)
 			.then(() => {
 				ci.setSubscribed(false);
 				this._tryDelete(ci);

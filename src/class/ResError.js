@@ -15,6 +15,7 @@ class ResError {
 		this._code = err.code || 'system.unknownError';
 		this._message = err.message || `Unknown error`;
 		this._data = err.data;
+		return this;
 	}
 
 	/**

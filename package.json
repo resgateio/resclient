@@ -27,6 +27,10 @@
     "type": "git",
     "url": "git+https://github.com/jirenius/resclient"
   },
+  "jest": {
+    "testEnvironment": "jsdom",
+    "testURL": "http://localhost/"
+  },
   "author": "Samuel Jirénius <samuel@jirenius.com>",
   "license": "MIT",
   "homepage": "https://github.com/jirenius/resclient",

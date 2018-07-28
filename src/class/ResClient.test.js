@@ -924,22 +924,22 @@ describe("ResClient", () => {
 
 	describe("reconnect", () => {
 
-		it("reconnects after connection is lost", () => {
-			let promise = client.connect()
-				.then(() => {
-					let oldUrl = server.url;
-					expect(server.isConnected()).toBe(true);
-					server.close();
-					return flushPromises().then(() => {
-						server = new ResServer(oldUrl);
-						expect(server.isConnected()).toBe(false);
+		it("reconnects after connection is lost while subscribing", () => {
+			return getServerResource('service.model', modelResources).then(model => {
+				model.on('change', cb);
 
-						return waitAWhile().then(flushPromises).then(() => {
-							expect(server.isConnected()).toBe(true);
-						});
+				let oldUrl = server.url;
+				expect(server.isConnected()).toBe(true);
+				server.close();
+				return flushPromises().then(() => {
+					server = new ResServer(oldUrl);
+					expect(server.isConnected()).toBe(false);
+
+					return waitAWhile().then(flushPromises).then(() => {
+						expect(server.isConnected()).toBe(true);
 					});
 				});
-			return flushRequests().then(() => promise);
+			});
 		});
 
 		it("resubscribes to a model after reconnect", () => {
