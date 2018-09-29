@@ -87,7 +87,7 @@ class ResClient {
 					return o;
 				},
 				getFactory: function(rid) { return this.list.getFactory(rid); },
-				syncronize: this._syncModel.bind(this)
+				synchronize: this._syncModel.bind(this)
 			},
 			collection: {
 				id: typeCollection,
@@ -102,13 +102,13 @@ class ResClient {
 					return v;
 				}),
 				getFactory: function(rid) { return this.list.getFactory(rid); },
-				syncronize: this._syncCollection.bind(this)
+				synchronize: this._syncCollection.bind(this)
 			},
 			error: {
 				id: typeError,
 				prepareData: dta => dta,
 				getFactory: rid => errorFactory,
-				syncronize: () => {}
+				synchronize: () => {}
 			}
 		};
 
@@ -379,7 +379,7 @@ class ResClient {
 	}
 
 	/**
-	 * Recieves a incoming json encoded data string and executes the appropriate functions/callbacks.
+	 * Receives a incoming json encoded data string and executes the appropriate functions/callbacks.
 	 * @param {string} json Json encoded data
 	 * @private
 	 */
@@ -953,7 +953,7 @@ class ResClient {
 				this._removeStale(rid);
 			}
 			// If an item is already set,
-			// it has gone stale and needs to be syncronized.
+			// it has gone stale and needs to be synchronized.
 			if (ci.item) {
 				if (ci.type !== type.id) {
 					console.error("Resource type inconsistency");
@@ -989,7 +989,7 @@ class ResClient {
 
 		for (let rid in refs) {
 			let ci = this.cache[rid];
-			type.syncronize(ci, refs[rid]);
+			type.synchronize(ci, refs[rid]);
 		}
 	}
 
