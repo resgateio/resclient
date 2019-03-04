@@ -8,7 +8,9 @@
     "resclient": "^2.0.2"
   },
   "scripts": {
-    "start": "concurrently \"node server.js\" \"react-scripts start\""
+    "start": "concurrently \"node server.js\" \"react-scripts start\"",
+    "start-server": "node server.js",
+    "start-client": "react-scripts start"
   },
   "browserslist": [
     ">0.2%",
