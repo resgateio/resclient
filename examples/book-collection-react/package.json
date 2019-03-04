@@ -1,0 +1,22 @@
+{
+  "name": "book-collection-react",
+  "dependencies": {
+    "nats": "^1.2.2",
+    "react": "^16.8.3",
+    "react-dom": "^16.8.3",
+    "react-scripts": "2.1.5",
+    "resclient": "^2.0.2"
+  },
+  "scripts": {
+    "start": "concurrently \"node server.js\" \"react-scripts start\""
+  },
+  "browserslist": [
+    ">0.2%",
+    "not dead",
+    "not ie <= 11",
+    "not op_mini all"
+  ],
+  "devDependencies": {
+    "concurrently": "^4.1.0"
+  }
+}
