@@ -253,15 +253,21 @@ ResCollection represents a collection provided over the RES API.
 
 * [ResCollection](#ResCollection)
     * [new ResCollection(api, rid, [opt])](#new_ResCollection_new)
-    * [.length](#ResCollection+length)
-    * [.getResourceId()](#ResCollection+getResourceId) ⇒ <code>string</code>
-    * [.on([events], [handler])](#ResCollection+on) ⇒ <code>this</code>
-    * [.off([events], [handler])](#ResCollection+off) ⇒ <code>this</code>
-    * [.get(id)](#ResCollection+get) ⇒ <code>\*</code>
-    * [.indexOf(item)](#ResCollection+indexOf) ⇒ <code>number</code>
-    * [.atIndex(idx)](#ResCollection+atIndex) ⇒ <code>\*</code>
-    * [.call(method, params)](#ResCollection+call) ⇒ <code>Promise.&lt;object&gt;</code>
-    * [.toArray()](#ResCollection+toArray) ⇒ <code>Array.&lt;\*&gt;</code>
+    * _instance_
+        * [.length](#ResCollection+length)
+        * [.getResourceId()](#ResCollection+getResourceId) ⇒ <code>string</code>
+        * [.on([events], [handler])](#ResCollection+on) ⇒ <code>this</code>
+        * [.off([events], [handler])](#ResCollection+off) ⇒ <code>this</code>
+        * [.get(id)](#ResCollection+get) ⇒ <code>\*</code>
+        * [.indexOf(item)](#ResCollection+indexOf) ⇒ <code>number</code>
+        * [.atIndex(idx)](#ResCollection+atIndex) ⇒ <code>\*</code>
+        * [.call(method, params)](#ResCollection+call) ⇒ <code>Promise.&lt;object&gt;</code>
+        * [.toArray()](#ResCollection+toArray) ⇒ <code>Array.&lt;\*&gt;</code>
+    * _inner_
+        * [~addEvent](#ResCollection..addEvent) : <code>object</code>
+        * [~addCallback](#ResCollection..addCallback) : <code>function</code>
+        * [~removeEvent](#ResCollection..removeEvent) : <code>object</code>
+        * [~removeCallback](#ResCollection..removeCallback) : <code>function</code>
 
 <a name="new_ResCollection_new"></a>
 
@@ -295,27 +301,27 @@ Collection resource ID
 Attach a collection event handler function for one or more events.
 If no event or handler is provided, the collection will still be considered listened to,
 until a matching off call without arguments is made.
-Available events are 'add' and 'remove'.
+Available events are 'add', 'remove', and custom events.
 
 **Kind**: instance method of [<code>ResCollection</code>](#ResCollection)  
 
 | Param | Type | Description |
 | --- | --- | --- |
 | [events] | <code>string</code> | One or more space-separated events. Null means any event. |
-| [handler] | [<code>eventCallback</code>](#eventCallback) | Handler function to execute when the event is emitted. |
+| [handler] | [<code>addCallback</code>](#ResCollection..addCallback) \| [<code>removeCallback</code>](#ResCollection..removeCallback) \| [<code>eventCallback</code>](#eventCallback) | Handler function to execute when the event is emitted. |
 
 <a name="ResCollection+off"></a>
 
 ### resCollection.off([events], [handler]) ⇒ <code>this</code>
 Remove a collection event handler function.
-Available events are 'add' and 'remove'.
+Available events are 'add', 'remove', and custom events.
 
 **Kind**: instance method of [<code>ResCollection</code>](#ResCollection)  
 
 | Param | Type | Description |
 | --- | --- | --- |
 | [events] | <code>string</code> | One or more space-separated events. Null means any event. |
-| [handler] | [<code>eventCallback</code>](#eventCallback) | Handler function to remove. |
+| [handler] | [<code>addCallback</code>](#ResCollection..addCallback) \| [<code>removeCallback</code>](#ResCollection..removeCallback) \| [<code>eventCallback</code>](#eventCallback) | Handler function to remove. |
 
 <a name="ResCollection+get"></a>
 
@@ -374,6 +380,60 @@ Returns a shallow clone of the internal array.
 
 **Kind**: instance method of [<code>ResCollection</code>](#ResCollection)  
 **Returns**: <code>Array.&lt;\*&gt;</code> - Clone of internal array  
+<a name="ResCollection..addEvent"></a>
+
+### ResCollection~addEvent : <code>object</code>
+Add event data
+
+**Kind**: inner typedef of [<code>ResCollection</code>](#ResCollection)  
+**Properties**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| item | <code>\*</code> | Item being added to the collection. |
+| idx | <code>number</code> | Index where item was added. |
+
+<a name="ResCollection..addCallback"></a>
+
+### ResCollection~addCallback : <code>function</code>
+Add event emitted on any item being added to the collection.
+
+**Kind**: inner typedef of [<code>ResCollection</code>](#ResCollection)  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| event | <code>Collection~addEvent</code> | Add event data. |
+| collection | <code>Collection</code> | Collection emitting event. |
+| event | <code>string</code> | Event name including namespace. |
+| action | <code>string</code> | Event action. |
+
+<a name="ResCollection..removeEvent"></a>
+
+### ResCollection~removeEvent : <code>object</code>
+Remove event data
+
+**Kind**: inner typedef of [<code>ResCollection</code>](#ResCollection)  
+**Properties**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| item | <code>\*</code> | Item being removed from the collection. |
+| idx | <code>number</code> | Index from where the item was removed. |
+
+<a name="ResCollection..removeCallback"></a>
+
+### ResCollection~removeCallback : <code>function</code>
+Remove event emitted on any item being added to the collection.
+
+**Kind**: inner typedef of [<code>ResCollection</code>](#ResCollection)  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| event | <code>Collection~removeEvent</code> | Remove event data. |
+| collection | <code>Collection</code> | Collection emitting event. |
+| event | <code>string</code> | Event name including namespace. |
+| action | <code>string</code> | Event action. |
+
 <a name="ResModel"></a>
 
 ## ResModel
@@ -384,11 +444,14 @@ ResModel represents a model provided over the RES API.
 
 * [ResModel](#ResModel)
     * [new ResModel(api, rid, [opt])](#new_ResModel_new)
-    * [.getResourceId()](#ResModel+getResourceId) ⇒ <code>string</code>
-    * [.on([events], [handler])](#ResModel+on) ⇒ <code>this</code>
-    * [.off(events, [handler])](#ResModel+off) ⇒ <code>this</code>
-    * [.set(props)](#ResModel+set) ⇒ <code>Promise.&lt;object&gt;</code>
-    * [.call(method, params)](#ResModel+call) ⇒ <code>Promise.&lt;object&gt;</code>
+    * _instance_
+        * [.getResourceId()](#ResModel+getResourceId) ⇒ <code>string</code>
+        * [.on([events], [handler])](#ResModel+on) ⇒ <code>this</code>
+        * [.off(events, [handler])](#ResModel+off) ⇒ <code>this</code>
+        * [.set(props)](#ResModel+set) ⇒ <code>Promise.&lt;object&gt;</code>
+        * [.call(method, params)](#ResModel+call) ⇒ <code>Promise.&lt;object&gt;</code>
+    * _inner_
+        * [~changeCallback](#ResModel..changeCallback) : <code>function</code>
 
 <a name="new_ResModel_new"></a>
 
@@ -416,27 +479,27 @@ Model resource ID
 Attach a model event handler function for one or more events.
 If no event or handler is provided, the model will still be considered listened to,
 until a matching off call without arguments is made.
-Available event is 'change'.
+Available events are 'change', or custom events.
 
 **Kind**: instance method of [<code>ResModel</code>](#ResModel)  
 
 | Param | Type | Description |
 | --- | --- | --- |
 | [events] | <code>string</code> | One or more space-separated events. Null means any event. |
-| [handler] | [<code>eventCallback</code>](#eventCallback) | Handler function to execute when the event is emitted. |
+| [handler] | [<code>changeCallback</code>](#ResModel..changeCallback) \| [<code>eventCallback</code>](#eventCallback) | Handler function to execute when the event is emitted. |
 
 <a name="ResModel+off"></a>
 
 ### resModel.off(events, [handler]) ⇒ <code>this</code>
 Remove a model event handler function.
-Available event is 'change'.
+Available events are 'change', or custom events.
 
 **Kind**: instance method of [<code>ResModel</code>](#ResModel)  
 
 | Param | Type | Description |
 | --- | --- | --- |
 | events | <code>string</code> | One or more space-separated events. Null means any event. |
-| [handler] | [<code>eventCallback</code>](#eventCallback) | Handler function to remove. |
+| [handler] | [<code>changeCallback</code>](#ResModel..changeCallback) \| [<code>eventCallback</code>](#eventCallback) | Handler function to remove. |
 
 <a name="ResModel+set"></a>
 
@@ -462,6 +525,20 @@ Calls a method on the model.
 | --- | --- | --- |
 | method | <code>string</code> | Method name |
 | params | <code>\*</code> | Method parameters |
+
+<a name="ResModel..changeCallback"></a>
+
+### ResModel~changeCallback : <code>function</code>
+Change event emitted on any change to one or more public (non-underscore) properties.
+
+**Kind**: inner typedef of [<code>ResModel</code>](#ResModel)  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| changed | <code>Object.&lt;string, \*&gt;</code> | Changed key/value object where key is the changed property, and value is the old property value. |
+| model | <code>Model</code> | ResModel emitting the event. |
+| event | <code>string</code> | Event name including namespace. |
+| action | <code>string</code> | Event action. |
 
 <a name="ResError"></a>
 
@@ -523,7 +600,7 @@ Event callback
 | Param | Type | Description |
 | --- | --- | --- |
 | data | <code>object</code> | Event data object |
-| resource | <code>object</code> | Resource object |
+| resource | <code>object</code> | Resource emitting the event |
 | event | <code>string</code> | Event name including namespace |
 | action | <code>string</code> | Event action |
 
