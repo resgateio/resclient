@@ -21,7 +21,7 @@ class App extends Component {
 
 	handleAddNew = () => {
 		// Call ResClient to add new book
-		this.client.call('bookService.books', 'new', {
+		this.client.call('library.books', 'new', {
 			title: this.state.title,
 			author: this.state.author
 		}).then(() => {
@@ -47,7 +47,7 @@ class App extends Component {
 
 	componentDidMount(){
 		// Get the collection from the service.
-		this.client.get('bookService.books').then(books => {
+		this.client.get('library.books').then(books => {
 			this.setState({	books });
 		}).catch(err => this.showError(err.code === 'system.connectionError'
 			? "Connection error. Are NATS Server and Resgate running?"
@@ -56,11 +56,6 @@ class App extends Component {
 	}
 
 	render() {
-
-		let books = this.state.books
-			? <BookList books={this.state.books}></BookList>
-			: null;
-
 		return (
 			<div className="App">
 				<header className="shadow">
@@ -83,7 +78,11 @@ class App extends Component {
 					<div id="error-msg"></div>
 				</div>
 				<hr />
-				{books}
+				{
+					this.state.books
+						? <BookList books={this.state.books}></BookList>
+						: null
+				}
 			</div>
 		);
 	}

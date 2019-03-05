@@ -3,7 +3,7 @@ import Book from './Book';
 
 class BookList extends Component {
     onUpdate = () => {
-        this.forceUpdate();
+        this.setState({});
     }
 
     componentDidMount() {

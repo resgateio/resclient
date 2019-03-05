@@ -4,21 +4,24 @@
     "nats": "^1.2.2",
     "react": "^16.8.3",
     "react-dom": "^16.8.3",
-    "react-scripts": "2.1.5",
     "resclient": "^2.0.2"
   },
   "scripts": {
-    "start": "concurrently \"node server.js\" \"react-scripts start\"",
+    "start": "concurrently \"node server.js\" \"webpack-dev-server --open\"",
     "start-server": "node server.js",
-    "start-client": "react-scripts start"
+    "start-client": "webpack-dev-server --open"
   },
-  "browserslist": [
-    ">0.2%",
-    "not dead",
-    "not ie <= 11",
-    "not op_mini all"
-  ],
   "devDependencies": {
-    "concurrently": "^4.1.0"
+    "@babel/core": "^7.3.4",
+    "@babel/plugin-proposal-class-properties": "^7.3.4",
+    "@babel/preset-env": "^7.3.4",
+    "@babel/preset-react": "^7.0.0",
+    "babel-loader": "^8.0.5",
+    "concurrently": "^4.1.0",
+    "html-loader": "^0.5.5",
+    "html-webpack-plugin": "^3.2.0",
+    "webpack": "^4.29.6",
+    "webpack-cli": "^3.2.3",
+    "webpack-dev-server": "^3.2.1"
   }
 }

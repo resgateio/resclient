@@ -53,7 +53,7 @@ class Book extends Component {
 	}
 
 	onUpdate = () => {
-        this.forceUpdate();
+        this.setState({});
     }
 
     componentDidMount() {
