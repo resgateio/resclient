@@ -36,9 +36,9 @@ client.get('exampleService.myModel').then(model => {
 
 ## Full examples
 
-
 * [Modapp - Book Collection example (original)](https://github.com/jirenius/resgate/tree/master/examples/book-collection)
 * [React - Book Collection example](examples/book-collection-react/)
+* [Vue.js - Book Collection example](examples/book-collection-vuejs/)
 
 
 ## Documentation
