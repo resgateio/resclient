@@ -27,7 +27,7 @@ class Book extends Component {
 		this.props.book.set({
 			title: this.state.title,
 			author: this.state.author
-		}).then(() => 
+		}).then(() =>
 			this.setState({
 				isEdit: false
 			})

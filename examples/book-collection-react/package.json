@@ -1,5 +1,6 @@
 {
   "name": "book-collection-react",
+  "description": "Resgate Book Collection Example for React",
   "dependencies": {
     "nats": "^1.2.2",
     "react": "^16.8.3",

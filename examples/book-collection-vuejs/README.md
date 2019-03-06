@@ -1,8 +1,8 @@
-# Book Collection example - React
+# Book Collection example - Vue.js
 
-This is a React version of [Resgate's Book Collection example](https://github.com/jirenius/resgate/tree/master/examples/book-collection). It contains both a client and a server written for *node.js*.
+This is a Vue.js version of [Resgate's Book Collection example](https://github.com/jirenius/resgate/tree/master/examples/book-collection). It contains both a client and a server written for *node.js*.
 
-The purpose of this example is to show how ResClient can be used together with React. To learn more about writing services for Resgate, visit the [Resgate project](https://github.com/jirenius/resgate).
+The purpose of this example is to show how ResClient can be used together with Vue.js. To learn more about writing services for Resgate, visit the [Resgate project](https://github.com/jirenius/resgate).
 
 ## Prerequisite
 
@@ -17,20 +17,31 @@ npm install
 npm start
 ```
 
-Or run server and client in two separate consoles:
-```bash
-npm run start-server
-npm run start-client
-```
-
 Open the client
 ```
-http://localhost:3000
+http://localhost:8082
 ```
 
 ## Notes
 
-In the example, ResClient resources are passed as *props* to the React components. This allows the component to listen to events itself without having to rely on the parent, but uses `forceUpdate` to trigger rendering on events.
+In the example, `this.$forceUpdate` is used to trigger rerendering of the components. Instead of using *forceUpdate*, one could use *data* variables which are initialized from *props*, and updated in the event callback methods.
+
+```javascript
+data() {
+    return {
+        title: this.book.title,
+        author: this.book.author,
+        /* ... */
+    };
+},
+methods: {
+    onChange() {
+        this.title = this.book.title;
+        this.author = this.book.author;
+    },
+    /* ... */
+}
+```
 
 Suggestions on how to improve the example are appreciated.
 
