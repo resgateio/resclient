@@ -15,10 +15,10 @@ var Book = Vue.component('book', {
 		};
 	},
 	created() {
-		this.book.on('change', this.onChange);
+		this.book.on('change', this.onUpdate);
 	},
 	beforeDestroy() {
-		this.book.off('change', this.onChange);
+		this.book.off('change', this.onUpdate);
 	},
 	methods: {
 		handleEdit() {
@@ -42,7 +42,7 @@ var Book = Vue.component('book', {
 		handleCancel() {
 			this.isEdit = false;
 		},
-		onChange() {
+		onUpdate() {
 			this.$forceUpdate();
 		},
 		showError(err) {
@@ -59,15 +59,15 @@ var BookList = Vue.component('book-list', {
 	},
 	props: [ 'books' ],
 	created() {
-		this.books.on('add', this.onChange);
-		this.books.on('remove', this.onChange);
+		this.books.on('add', this.onUpdate);
+		this.books.on('remove', this.onUpdate);
 	},
 	beforeDestroy() {
-		this.books.off('add', this.onChange);
-		this.books.off('remove', this.onChange);
+		this.books.off('add', this.onUpdate);
+		this.books.off('remove', this.onUpdate);
 	},
 	methods: {
-		onChange() {
+		onUpdate() {
 			this.$forceUpdate();
 		},
 		showError(err) {
