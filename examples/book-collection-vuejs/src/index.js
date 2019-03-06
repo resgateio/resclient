@@ -107,7 +107,9 @@ new Vue({
 			}).catch(this.showError);
 		},
 		showError(err) {
-			this.errMsg = err && err.message ? err.message : String(err);
+			this.errMsg = err && err.code && err.code == 'system.connectionError'
+				? "Connection error. Are NATS Server and Resgate running?"
+				: err && err.message ? err.message : String(err);
 			clearTimeout(this.errTimer);
 			this.errTimer = setTimeout(() => this.errMsg = "", 7000);
 		}

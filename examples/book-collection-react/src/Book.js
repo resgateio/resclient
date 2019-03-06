@@ -20,7 +20,9 @@ class Book extends Component {
 	}
 
 	handleDelete = () => {
-		this.props.books.call('delete', { id: this.props.book.id });
+		this.props.books.call('delete', {
+			id: this.props.book.id
+		}).catch(this.props.showError);
 	}
 
 	handleOk = () => {
@@ -31,7 +33,7 @@ class Book extends Component {
 			this.setState({
 				isEdit: false
 			})
-		);
+		).catch(this.props.showError);
 	}
 
 	handleCancel = () => {
@@ -53,19 +55,19 @@ class Book extends Component {
 	}
 
 	onUpdate = () => {
-        this.setState({});
-    }
+		this.setState({});
+	}
 
-    componentDidMount() {
-        this.props.book.on('change', this.onUpdate);
-    }
+	componentDidMount() {
+		this.props.book.on('change', this.onUpdate);
+	}
 
 	componentWillUnmount() {
-        this.props.book.off('change', this.onUpdate);
-    }
+		this.props.book.off('change', this.onUpdate);
+	}
 
 	render() {
-        return (
+		return (
 			<div className={"Book" + (this.state.isEdit ? " editing" : "")}>
 				<div className="card shadow">
 					{ this.state.isEdit
