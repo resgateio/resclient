@@ -1,6 +1,38 @@
 import { obj } from 'modapp-utils';
 
 /**
+ * Add event emitted on any item being added to the collection.
+ * @callback ResCollection~addCallback
+ * @param {ResCollection~addEvent} event Add event data.
+ * @param {ResCollection} collection Collection emitting event.
+ * @param {string} event Event name including namespace.
+ * @param {?string} action Event action.
+ */
+
+ /**
+ * Add event data
+ * @typedef {object} ResCollection~addEvent
+ * @property {*} item Item being added to the collection.
+ * @property {number} idx Index where item was added.
+ */
+
+/**
+ * Remove event emitted on any item being added to the collection.
+ * @callback ResCollection~removeCallback
+ * @param {ResCollection~removeEvent} event Remove event data.
+ * @param {ResCollection} collection Collection emitting event.
+ * @param {string} event Event name including namespace.
+ * @param {?string} action Event action.
+ */
+
+/**
+ * Remove event data
+ * @typedef {object} ResCollection~removeEvent
+ * @property {*} item Item being removed from the collection.
+ * @property {number} idx Index from where the item was removed.
+ */
+
+/**
  * ResCollection represents a collection provided over the RES API.
  * @implements {module:modapp~Collection}
  */
@@ -45,9 +77,9 @@ class ResCollection {
 	 * Attach a collection event handler function for one or more events.
 	 * If no event or handler is provided, the collection will still be considered listened to,
 	 * until a matching off call without arguments is made.
-	 * Available events are 'add' and 'remove'.
+	 * Available events are 'add', 'remove', and custom events.
 	 * @param {?string} [events] One or more space-separated events. Null means any event.
-	 * @param {eventCallback} [handler] Handler function to execute when the event is emitted.
+	 * @param {ResCollection~addCallback|ResCollection~removeCallback|eventCallback} [handler] Handler function to execute when the event is emitted.
 	 * @returns {this}
 	 */
 	on(events, handler) {
@@ -57,9 +89,9 @@ class ResCollection {
 
 	 /**
 	 * Remove a collection event handler function.
-	 * Available events are 'add' and 'remove'.
+	 * Available events are 'add', 'remove', and custom events.
 	 * @param {?string} [events] One or more space-separated events. Null means any event.
-	 * @param {eventCallback} [handler] Handler function to remove.
+	 * @param {ResCollection~addCallback|ResCollection~removeCallback|eventCallback} [handler] Handler function to remove.
 	 * @returns {this}
 	 */
 	off(events, handler) {

@@ -1,8 +1,8 @@
-/node_modules
-/coverage
-/package-lock.json
-/yarn.lock
-/*.log
+node_modules
+coverage
+package-lock.json
+yarn.lock
+*.log
 
 # Build files.
 /dist
