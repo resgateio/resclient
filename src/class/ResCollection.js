@@ -9,7 +9,7 @@ import { obj } from 'modapp-utils';
  * @param {?string} action Event action.
  */
 
- /**
+/**
  * Add event data
  * @typedef {object} ResCollection~addEvent
  * @property {*} item Item being added to the collection.
