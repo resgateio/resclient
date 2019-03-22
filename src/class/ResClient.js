@@ -1155,7 +1155,7 @@ class ResClient {
 	}
 
 	_resolvePath(url) {
-		if (url.match(/^wss?:\/\//)) {
+		if (url.match(/^wss?:\/\//) || typeof document == 'undefined' || !document.createElement) {
 			return url;
 		}
 
