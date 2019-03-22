@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8" />
+		<title>Book Collection Example</title>
+		<script src="https://unpkg.com/resclient@latest/dist/resclient.min.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+		<style>
+			body {
+				background: #eee;
+				font-family: Arial, Helvetica, sans-serif;
+				padding: 0;
+				margin: 0;
+			}
+			header {
+				background: #000;
+				color: #fff;
+				padding: 16px 1em;
+			}
+			h1 {
+				margin: 0;
+				padding: 0;
+				line-height: 32px;
+				font-size: 24px;
+			}
+			.top {
+				margin: 1em 1em;
+			}
+			.shadow {
+				box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+			}
+			.book-list {
+				max-width: 800px;
+				margin: 0 1em;
+			}
+			.new-container { margin: 1em 0; }
+			label {
+				margin: 0.5em 1em 0.5em 0;
+				font-weight: bold;
+			}
+			.new-container input { margin-right: 1em; }
+			.error-msg { color: #800 }
+			button {
+				display: inline-block;
+				border: none;
+				background: none;
+				color: #006;
+			}
+			button:hover { background: rgba(0,0,0,0.12); }
+			.list-item { padding: 8px 0; }
+			.card {
+				background: #fff;
+				padding: 1em 1em;
+				box-sizing: border-box;
+			}
+			.action { float: right }
+			.editing > .card { background: #eaeaff; }
+			.card > .edit { display: none; }
+			.editing > .card > .edit {	display: inherit; }
+			.editing > .card > .view {	display: none; }
+			.card h3 { margin: 0 0 8px 0; }
+			.card .author { font-style: italic; }
+			.label {
+				display: inline-block;
+				width: 80px;
+				font-weight: bold;
+			}
+			.edit-input + .edit-input { margin-top: 4px; }
+		</style>
+
+		<!-- template for the book component -->
+		<script type="text/x-template" id="book-template">
+			<div class="list-item" v-bind:class="{ editing: isEdit }">
+				<div class="card shadow">
+					<div class="view">
+						<div class="action">
+							<button @click="handleEdit">Edit</button>
+							<button @click="handleDelete">Delete</button>
+						</div>
+						<div class="title">
+							<h3>{{ book.title }}</h3>
+						</div>
+						<div class="author">
+							<span>By {{ book.author }}</span>
+						</div>
+					</div>
+					<div class="edit">
+						<div class="action">
+							<button @click="handleOk">OK</button>
+							<button @click="handleCancel">Cancel</button>
+						</div>
+						<div class="edit-input">
+							<span class="label">Title</span>
+							<input v-model="editTitle" />
+						</div>
+						<div class="edit-input">
+							<span class="label">Author</span>
+							<input v-model="editAuthor" />
+						</div>
+					</div>
+				</div>
+			</div>
+		</script>
+
+		<!-- template for the book-list component -->
+		<script type="text/x-template" id="book-list-template">
+			<div class="book-list">
+				<book v-for="book in books" :key="book.id" :book="book" :books="books" @error="showError"></book>
+			</div>
+		</script>
+	</head>
+	<body>
+		<div id="app">
+			<header class="shadow">
+				<h1>Book Collection Example</h1>
+			</header>
+			<div class="top">
+				<div class="new-container">
+					<label for="new-title">Title</label><input id="new-title" v-model="newTitle" />
+					<label for="new-author">Author</label><input id="new-author" v-model="newAuthor" />
+					<button @click="handleAddNew">Add new</button>
+				</div>
+				<div class="error-msg">{{ errMsg }}</div>
+			</div>
+			<hr>
+			<book-list v-if="books" :books="books" @error="showError"></book-list>
+		</div>
+
+		<script src="index.js"></script>
+	</body>
+</html>

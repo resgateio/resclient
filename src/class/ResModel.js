@@ -1,6 +1,15 @@
 import { obj } from 'modapp-utils';
 
 /**
+ * Change event emitted on any change to one or more public (non-underscore) properties.
+ * @callback ResModel~changeCallback
+ * @param {Object.<string,*>} changed Changed key/value object where key is the changed property, and value is the old property value.
+ * @param {Model} model ResModel emitting the event.
+ * @param {string} event Event name including namespace.
+ * @param {?string} action Event action.
+ */
+
+/**
  * ResModel represents a model provided over the RES API.
  * @implements {module:modapp~Model}
  */
@@ -34,9 +43,9 @@ class ResModel {
 	 * Attach a model event handler function for one or more events.
 	 * If no event or handler is provided, the model will still be considered listened to,
 	 * until a matching off call without arguments is made.
-	 * Available event is 'change'.
+	 * Available events are 'change', or custom events.
 	 * @param {?string} [events] One or more space-separated events. Null means any event.
-	 * @param {eventCallback} [handler] Handler function to execute when the event is emitted.
+	 * @param {ResModel~changeCallback|eventCallback} [handler] Handler function to execute when the event is emitted.
 	 * @returns {this}
 	 */
 	on(events, handler) {
@@ -46,9 +55,9 @@ class ResModel {
 
 	 /**
 	 * Remove a model event handler function.
-	 * Available event is 'change'.
+	 * Available events are 'change', or custom events.
 	 * @param {?string} events One or more space-separated events. Null means any event.
-	 * @param {eventCallback} [handler] Handler function to remove.
+	 * @param {ResModel~changeCallback|eventCallback} [handler] Handler function to remove.
 	 * @returns {this}
 	 */
 	off(events, handler) {

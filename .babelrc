@@ -2,12 +2,12 @@
     "env": {
         "test": {
             "presets": [
-                ["env"]
+                ["@babel/env"]
             ]
         },
         "commonjs": {
             "presets": [
-                ["env", {
+                ["@babel/env", {
                     "useBuiltIns": false
                 }]
             ],
@@ -17,7 +17,7 @@
         },
         "es": {
             "presets": [
-                ["env", {
+                ["@babel/env", {
                     "useBuiltIns": false,
                     "modules": false
                 }]

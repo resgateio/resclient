@@ -1,9 +1,9 @@
 [![view on npm](http://img.shields.io/npm/v/resclient.svg)](https://www.npmjs.org/package/resclient)
 
-# RES Client
+# ResClient
 Javascript client implementing the RES-Client Protocol.
 
-The client is used to connect to a RES API. For more information about the protocol, and some quick start examples, visit the [resgate](https://github.com/jirenius/resgate) project.
+The client is used to connect to a RES API. For more information about the protocol, and some quick start examples, [visit the Resgate project](https://github.com/jirenius/resgate).
 
 ## Installation
 
@@ -33,6 +33,13 @@ client.get('exampleService.myModel').then(model => {
 	setTimeout(() => model.off('change', onChange), 5000);
 });
 ```
+
+## Full examples
+
+* [Modapp - Book Collection example (original)](https://github.com/jirenius/resgate/tree/master/examples/book-collection)
+* [React - Book Collection example](examples/book-collection-react/)
+* [Vue.js - Book Collection example](examples/book-collection-vuejs/)
+
 
 ## Documentation
 

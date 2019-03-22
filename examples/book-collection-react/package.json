@@ -1,0 +1,28 @@
+{
+  "name": "book-collection-react",
+  "description": "Resgate Book Collection Example for React",
+  "dependencies": {
+    "nats": "^1.2.2",
+    "react": "^16.8.3",
+    "react-dom": "^16.8.3",
+    "resclient": "^2.0.2"
+  },
+  "scripts": {
+    "start": "concurrently \"node server.js\" \"webpack-dev-server --open\"",
+    "start-server": "node server.js",
+    "start-client": "webpack-dev-server --open"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.3.4",
+    "@babel/plugin-proposal-class-properties": "^7.3.4",
+    "@babel/preset-env": "^7.3.4",
+    "@babel/preset-react": "^7.0.0",
+    "babel-loader": "^8.0.5",
+    "concurrently": "^4.1.0",
+    "html-loader": "^0.5.5",
+    "html-webpack-plugin": "^3.2.0",
+    "webpack": "^4.29.6",
+    "webpack-cli": "^3.2.3",
+    "webpack-dev-server": "^3.2.1"
+  }
+}

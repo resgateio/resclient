@@ -17,8 +17,7 @@ export default {
 			browser: true,
 		}),
 		babel({
-			exclude: 'node_modules/**',
-			plugins: [ 'external-helpers' ]
+			exclude: 'node_modules/**'
 		}),
 		commonjs(),
 		(process.env.NODE_ENV === 'production' && uglify()),
