@@ -7,6 +7,8 @@
 <p align="center">
 <a href="http://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
 <a href="https://www.npmjs.org/package/resclient"><img src="http://img.shields.io/npm/v/resclient.svg" alt="View on NPM"></a>
+<a href="https://travis-ci.com/jirenius/resclient"><img src="https://travis-ci.com/jirenius/resclient.svg?branch=master" alt="Build Status"></a>
+<a href="https://coveralls.io/github/jirenius/resclient?branch=master"><img src="https://coveralls.io/repos/github/jirenius/resclient/badge.svg?branch=master" alt="Coverage"></a>
 </p>
 
 ---
