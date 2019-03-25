@@ -12,7 +12,7 @@
     "src"
   ],
   "scripts": {
-    "clean": "rimraf lib dist es coverage docs && mkdir docs",
+    "clean": "rimraf lib dist es coverage",
     "build": "npm run clean && npm run build:commonjs && npm run build:es && npm run build:umd && npm run build:umd:min && npm run build:docs",
     "build:commonjs": "cross-env BABEL_ENV=commonjs babel src --out-dir lib",
     "build:es": "cross-env BABEL_ENV=es babel src --out-dir es",
@@ -20,8 +20,9 @@
     "build:umd:min": "cross-env BABEL_ENV=es NODE_ENV=production rollup src/index.js --config --file dist/resclient.min.js",
     "build:docs": "jsdoc2md -f ./src/class/ResClient.js -f ./src/class/ResCollection.js -f ./src/class/ResModel.js -f ./src/class/ResError.js -f ./src/def/eventCallback.js > ./docs/docs.md",
     "eslint": "eslint src/**/*.js",
-    "jest": "jest src --coverage",
-    "test": "npm run eslint && npm run jest"
+    "jest": "jest src --coverage --coverageReporters=text-lcov",
+    "test": "npm run eslint && npm run jest",
+    "coveralls": "jest --coverage --coverageReporters=text-lcov | coveralls"
   },
   "repository": {
     "type": "git",
@@ -39,6 +40,7 @@
     "@babel/core": "^7.4.0",
     "@babel/preset-env": "^7.4.2",
     "babel-jest": "^24.5.0",
+    "coveralls": "^3.0.3",
     "cross-env": "^5.2.0",
     "eslint": "^5.15.3",
     "jest": "^24.5.0",
