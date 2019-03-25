@@ -20,7 +20,7 @@
     "build:umd:min": "cross-env BABEL_ENV=es NODE_ENV=production rollup src/index.js --config --file dist/resclient.min.js",
     "build:docs": "jsdoc2md -f ./src/class/ResClient.js -f ./src/class/ResCollection.js -f ./src/class/ResModel.js -f ./src/class/ResError.js -f ./src/def/eventCallback.js > ./docs/docs.md",
     "eslint": "eslint src/**/*.js",
-    "jest": "jest src --coverage --coverageReporters=text-lcov",
+    "jest": "jest src --coverage",
     "test": "npm run eslint && npm run jest",
     "coveralls": "jest --coverage --coverageReporters=text-lcov | coveralls"
   },
