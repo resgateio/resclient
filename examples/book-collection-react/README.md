@@ -1,12 +1,12 @@
 # Book Collection example - React
 
-This is a React version of [Resgate's Book Collection example](https://github.com/jirenius/resgate/tree/master/examples/book-collection). It contains both a client and a server written for *node.js*.
+This is a React version of [Resgate's Book Collection example](https://github.com/resgateio/resgate/tree/master/examples/book-collection). It contains both a client and a server written for *node.js*.
 
-The purpose of this example is to show how ResClient can be used together with React. To learn more about writing services for Resgate, visit the [Resgate project](https://github.com/jirenius/resgate).
+The purpose of this example is to show how ResClient can be used together with React. To learn more about writing services for Resgate, visit the [Resgate project](https://github.com/resgateio/resgate).
 
 ## Prerequisite
 
-* Have [NATS Server](https://nats.io/download/nats-io/gnatsd/) and [Resgate](https://github.com/jirenius/resgate) running
+* Have [NATS Server](https://nats.io/download/nats-io/gnatsd/) and [Resgate](https://github.com/resgateio/resgate) running
 * Have [node.js](https://nodejs.org/en/download/) installed
 
 ## Running the example
