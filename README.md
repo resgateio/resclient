@@ -7,8 +7,8 @@
 <p align="center">
 <a href="http://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
 <a href="https://www.npmjs.org/package/resclient"><img src="http://img.shields.io/npm/v/resclient.svg" alt="View on NPM"></a>
-<a href="https://travis-ci.com/jirenius/resclient"><img src="https://travis-ci.com/jirenius/resclient.svg?branch=master" alt="Build Status"></a>
-<a href="https://coveralls.io/github/jirenius/resclient?branch=master"><img src="https://coveralls.io/repos/github/jirenius/resclient/badge.svg?branch=master" alt="Coverage"></a>
+<a href="https://travis-ci.com/resgateio/resclient"><img src="https://travis-ci.com/resgateio/resclient.svg?branch=master" alt="Build Status"></a>
+<a href="https://coveralls.io/github/resgateio/resclient?branch=master"><img src="https://coveralls.io/repos/github/resgateio/resclient/badge.svg?branch=master" alt="Coverage"></a>
 </p>
 
 ---
@@ -57,7 +57,7 @@ client.get('example.mymodel').then(model => {
 | --- | ---
 | [React](examples/book-collection-react/) | React client implementation of the Book Collection example.
 | [Vue.js](examples/book-collection-vuejs/) | Vue.js client implementation of the Book Collection example.
-| [Modapp](https://github.com/jirenius/resgate/tree/master/examples/book-collection) | Book Collection example from Resgate repository
+| [Modapp](https://github.com/resgateio/resgate/tree/master/examples/book-collection) | Book Collection example from Resgate repository
 
 > **Note**
 >
@@ -65,4 +65,4 @@ client.get('example.mymodel').then(model => {
 
 ## Documentation
 
-[Markdown documentation](https://github.com/jirenius/resclient/blob/master/docs/docs.md)
+[Markdown documentation](docs/docs.md)
