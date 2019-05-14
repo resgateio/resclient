@@ -26,7 +26,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jirenius/resclient"
+    "url": "git+https://github.com/resgateio/resclient"
   },
   "jest": {
     "testEnvironment": "jsdom",
@@ -34,7 +34,7 @@
   },
   "author": "Samuel Jirénius <samuel@jirenius.com>",
   "license": "MIT",
-  "homepage": "https://github.com/jirenius/resclient",
+  "homepage": "https://github.com/resgateio/resclient",
   "devDependencies": {
     "@babel/cli": "^7.2.3",
     "@babel/core": "^7.4.0",
