@@ -418,6 +418,95 @@ describe("ResClient", () => {
 		});
 	});
 
+	describe("on", () => {
+
+		it("emits connect event on connect", () => {
+			client.on('connect', cb);
+			let promise = client.connect().then(() => {
+				jest.runAllTimers();
+				expect(cb.mock.calls.length).toBe(1);
+				expect(typeof cb.mock.calls[0][0]).toBe('object');
+			});
+			jest.runOnlyPendingTimers();
+			return promise;
+		});
+
+		it("emits disconnect event on disconnect", () => {
+			client.on('disconnect', cb);
+			let promise = client.connect().then(() => {
+				client.disconnect();
+				jest.runAllTimers();
+				expect(cb.mock.calls.length).toBe(1);
+				expect(typeof cb.mock.calls[0][0]).toBe('object');
+			});
+			jest.runOnlyPendingTimers();
+			return promise;
+		});
+
+		it("emits error event on error", () => {
+			client.on('error', cb);
+			let promise = client.get('service.model');
+			return flushRequests().then(() => {
+				let req = server.getNextRequest();
+				server.sendError(req, 'system.notFound', "Not found");
+				jest.runOnlyPendingTimers();
+
+				return promise.catch(() => {
+					jest.runAllTimers();
+					expect(cb.mock.calls.length).toBe(1);
+					expect(cb.mock.calls[0][0]).toEqual(expect.objectContaining({
+						code: 'system.notFound',
+						message: "Not found"
+					}));
+				});
+			});
+		});
+
+	});
+
+	describe("off", () => {
+
+		it("does not emits connect event after connect after calling off", () => {
+			client.on('connect', cb);
+			client.off('connect', cb);
+			let promise = client.connect().then(() => {
+				jest.runAllTimers();
+				expect(cb.mock.calls.length).toBe(0);
+			});
+			jest.runOnlyPendingTimers();
+			return promise;
+		});
+
+		it("does not emits disconnect event on disconnect after calling off", () => {
+			client.on('disconnect', cb);
+			client.off('disconnect', cb);
+			let promise = client.connect().then(() => {
+				client.disconnect();
+				jest.runAllTimers();
+				expect(cb.mock.calls.length).toBe(0);
+			});
+			jest.runOnlyPendingTimers();
+			return promise;
+		});
+
+		it("does not emits error event on error after calling off", () => {
+			client.on('error', cb);
+			client.off('error', cb);
+			let promise = client.get('service.model');
+			return flushRequests().then(() => {
+				let req = server.getNextRequest();
+				server.sendError(req, 'system.notFound', "Not found");
+				jest.runOnlyPendingTimers();
+
+				return promise.catch(() => {
+					jest.runAllTimers();
+					expect(cb.mock.calls.length).toBe(0);
+				});
+			});
+		});
+
+	});
+
 	describe("model.on", () => {
 
 		it("does not unsubscribe to model being listened to", () => {

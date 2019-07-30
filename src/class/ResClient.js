@@ -35,6 +35,25 @@ const stateKeep = 2;
 const stateStale = 3;
 
 /**
+ * Connect event emitted on connect.
+ * @callback ResClient~connectCallback
+ * @param {object} event WebSocket open event object
+ */
+
+/**
+ * Disconnect event emitted on disconnect.
+ * @callback ResClient~disconnectCallback
+ * @param {object} event WebSocket close event object
+ */
+
+/**
+ * Error event emitted on error.
+ * @callback ResClient~errorCallback
+ * @param {ResError} err ResError object
+ */
+
+
+/**
  * ResClient is a client implementing the RES-Client protocol.
  */
 class ResClient {
@@ -161,18 +180,20 @@ class ResClient {
 	}
 
 	/**
-	 * Attach an  event handler function for one or more instance events.
+	 * Attach an event handler function for one or more instance events.
+	 * Available events are 'connect', 'disconnect', and 'error'.
 	 * @param {?string} events One or more space-separated events. Null means any event.
-	 * @param {eventCallback} handler A function to execute when the event is emitted.
+	 * @param {ResClient~connectCallback|ResClient~disconnectCallback|ResClient~errorCallback} handler Handler function to execute when the event is emitted.
 	 */
 	on(events, handler) {
 		this.eventBus.on(this, events, handler, this.namespace);
 	}
 
-	 /**
+	/**
 	 * Remove an instance event handler.
+	 * Available events are 'connect', 'disconnect', and 'error'.
 	 * @param {?string} events One or more space-separated events. Null means any event.
-	 * @param {eventCallback} [handler] An optional handler function. The handler will only be remove if it is the same handler.
+	 * @param {ResClient~connectCallback|ResClient~disconnectCallback|ResClient~errorCallback} [handler] Handler function to remove.
 	 */
 	off(events, handler) {
 		this.eventBus.off(this, events, handler, this.namespace);
@@ -705,7 +726,7 @@ class ResClient {
 				}
 			}
 
-			this._emit('close', e);
+			this._emit('disconnect', e);
 		}
 
 		let hasStale = false;
@@ -747,8 +768,8 @@ class ResClient {
 		}
 	}
 
-	_emit(event, data, ctx) {
-		this.eventBus.emit(event, data, this.namespace);
+	_emit(event, data) {
+		this.eventBus.emit(this, event, data, this.namespace);
 	}
 
 	/**

@@ -35,21 +35,26 @@ ResClient is a client implementing the RES-Client protocol.
 
 * [ResClient](#ResClient)
     * [new ResClient(hostUrl, [opt])](#new_ResClient_new)
-    * [.connect()](#ResClient+connect) ⇒ <code>Promise</code>
-    * [.disconnect()](#ResClient+disconnect)
-    * [.getHostUrl()](#ResClient+getHostUrl) ⇒ <code>string</code>
-    * [.on(events, handler)](#ResClient+on)
-    * [.off(events, [handler])](#ResClient+off)
-    * [.setOnConnect(onConnect)](#ResClient+setOnConnect) ⇒ <code>this</code>
-    * [.registerModelType(pattern, factory)](#ResClient+registerModelType)
-    * [.unregisterModelType(pattern)](#ResClient+unregisterModelType) ⇒ [<code>resourceFactoryCallback</code>](#resourceFactoryCallback)
-    * [.registerCollectionType(pattern, factory)](#ResClient+registerCollectionType)
-    * [.unregisterCollectionType(pattern)](#ResClient+unregisterCollectionType) ⇒ [<code>resourceFactoryCallback</code>](#resourceFactoryCallback)
-    * [.get(rid, [collectionFactory])](#ResClient+get) ⇒ <code>Promise.&lt;(ResModel\|ResCollection)&gt;</code>
-    * [.call(rid, method, params)](#ResClient+call) ⇒ <code>Promise.&lt;object&gt;</code>
-    * [.authenticate(rid, method, params)](#ResClient+authenticate) ⇒ <code>Promise.&lt;object&gt;</code>
-    * [.create(rid, params)](#ResClient+create) ⇒ <code>Promise.&lt;(ResModel\|ResCollection)&gt;</code>
-    * [.setModel(modelId, props)](#ResClient+setModel) ⇒ <code>Promise.&lt;object&gt;</code>
+    * _instance_
+        * [.connect()](#ResClient+connect) ⇒ <code>Promise</code>
+        * [.disconnect()](#ResClient+disconnect)
+        * [.getHostUrl()](#ResClient+getHostUrl) ⇒ <code>string</code>
+        * [.on(events, handler)](#ResClient+on)
+        * [.off(events, [handler])](#ResClient+off)
+        * [.setOnConnect(onConnect)](#ResClient+setOnConnect) ⇒ <code>this</code>
+        * [.registerModelType(pattern, factory)](#ResClient+registerModelType)
+        * [.unregisterModelType(pattern)](#ResClient+unregisterModelType) ⇒ [<code>resourceFactoryCallback</code>](#resourceFactoryCallback)
+        * [.registerCollectionType(pattern, factory)](#ResClient+registerCollectionType)
+        * [.unregisterCollectionType(pattern)](#ResClient+unregisterCollectionType) ⇒ [<code>resourceFactoryCallback</code>](#resourceFactoryCallback)
+        * [.get(rid, [collectionFactory])](#ResClient+get) ⇒ <code>Promise.&lt;(ResModel\|ResCollection)&gt;</code>
+        * [.call(rid, method, params)](#ResClient+call) ⇒ <code>Promise.&lt;object&gt;</code>
+        * [.authenticate(rid, method, params)](#ResClient+authenticate) ⇒ <code>Promise.&lt;object&gt;</code>
+        * [.create(rid, params)](#ResClient+create) ⇒ <code>Promise.&lt;(ResModel\|ResCollection)&gt;</code>
+        * [.setModel(modelId, props)](#ResClient+setModel) ⇒ <code>Promise.&lt;object&gt;</code>
+    * _inner_
+        * [~connectCallback](#ResClient..connectCallback) : <code>function</code>
+        * [~disconnectCallback](#ResClient..disconnectCallback) : <code>function</code>
+        * [~errorCallback](#ResClient..errorCallback) : <code>function</code>
 
 <a name="new_ResClient_new"></a>
 
@@ -90,26 +95,28 @@ Gets the host URL to the RES API
 <a name="ResClient+on"></a>
 
 ### resClient.on(events, handler)
-Attach an  event handler function for one or more instance events.
+Attach an event handler function for one or more instance events.
+Available events are 'connect', 'disconnect', and 'error'.
 
 **Kind**: instance method of [<code>ResClient</code>](#ResClient)  
 
 | Param | Type | Description |
 | --- | --- | --- |
 | events | <code>string</code> | One or more space-separated events. Null means any event. |
-| handler | [<code>eventCallback</code>](#eventCallback) | A function to execute when the event is emitted. |
+| handler | [<code>connectCallback</code>](#ResClient..connectCallback) \| [<code>disconnectCallback</code>](#ResClient..disconnectCallback) \| [<code>errorCallback</code>](#ResClient..errorCallback) | Handler function to execute when the event is emitted. |
 
 <a name="ResClient+off"></a>
 
 ### resClient.off(events, [handler])
 Remove an instance event handler.
+Available events are 'connect', 'disconnect', and 'error'.
 
 **Kind**: instance method of [<code>ResClient</code>](#ResClient)  
 
 | Param | Type | Description |
 | --- | --- | --- |
 | events | <code>string</code> | One or more space-separated events. Null means any event. |
-| [handler] | [<code>eventCallback</code>](#eventCallback) | An optional handler function. The handler will only be remove if it is the same handler. |
+| [handler] | [<code>connectCallback</code>](#ResClient..connectCallback) \| [<code>disconnectCallback</code>](#ResClient..disconnectCallback) \| [<code>errorCallback</code>](#ResClient..errorCallback) | Handler function to remove. |
 
 <a name="ResClient+setOnConnect"></a>
 
@@ -242,6 +249,39 @@ Calls the set method to update model properties.
 | --- | --- | --- |
 | modelId | <code>string</code> | Model resource ID. |
 | props | <code>object</code> | Properties. Set value to undefined to delete a property. |
+
+<a name="ResClient..connectCallback"></a>
+
+### ResClient~connectCallback : <code>function</code>
+Connect event emitted on connect.
+
+**Kind**: inner typedef of [<code>ResClient</code>](#ResClient)  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| event | <code>object</code> | WebSocket open event object |
+
+<a name="ResClient..disconnectCallback"></a>
+
+### ResClient~disconnectCallback : <code>function</code>
+Disconnect event emitted on disconnect.
+
+**Kind**: inner typedef of [<code>ResClient</code>](#ResClient)  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| event | <code>object</code> | WebSocket close event object |
+
+<a name="ResClient..errorCallback"></a>
+
+### ResClient~errorCallback : <code>function</code>
+Error event emitted on error.
+
+**Kind**: inner typedef of [<code>ResClient</code>](#ResClient)  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| err | [<code>ResError</code>](#ResError) | ResError object |
 
 <a name="ResCollection"></a>
 
