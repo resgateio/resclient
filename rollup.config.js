@@ -12,9 +12,7 @@ export default {
 	},
 	plugins: [
 		resolve({
-			jsnext: true,
-			main: true,
-			browser: true,
+			mainFields: [ 'jsnext:main', 'main', 'browser' ]
 		}),
 		babel({
 			exclude: 'node_modules/**'
