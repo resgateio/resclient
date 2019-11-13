@@ -295,6 +295,7 @@ ResCollection represents a collection provided over the RES API.
     * [new ResCollection(api, rid, [opt])](#new_ResCollection_new)
     * _instance_
         * [.length](#ResCollection+length)
+        * [.getClient()](#ResCollection+getClient) ⇒ [<code>ResClient</code>](#ResClient)
         * [.getResourceId()](#ResCollection+getResourceId) ⇒ <code>string</code>
         * [.on([events], [handler])](#ResCollection+on) ⇒ <code>this</code>
         * [.off([events], [handler])](#ResCollection+off) ⇒ <code>this</code>
@@ -328,6 +329,13 @@ Creates an ResCollection instance
 Length of the collection
 
 **Kind**: instance property of [<code>ResCollection</code>](#ResCollection)  
+<a name="ResCollection+getClient"></a>
+
+### resCollection.getClient() ⇒ [<code>ResClient</code>](#ResClient)
+ResClient instance.
+
+**Kind**: instance method of [<code>ResCollection</code>](#ResCollection)  
+**Returns**: [<code>ResClient</code>](#ResClient) - ResClient instance  
 <a name="ResCollection+getResourceId"></a>
 
 ### resCollection.getResourceId() ⇒ <code>string</code>
@@ -485,6 +493,7 @@ ResModel represents a model provided over the RES API.
 * [ResModel](#ResModel)
     * [new ResModel(api, rid, [opt])](#new_ResModel_new)
     * _instance_
+        * [.getClient()](#ResModel+getClient) ⇒ [<code>ResClient</code>](#ResClient)
         * [.getResourceId()](#ResModel+getResourceId) ⇒ <code>string</code>
         * [.on([events], [handler])](#ResModel+on) ⇒ <code>this</code>
         * [.off(events, [handler])](#ResModel+off) ⇒ <code>this</code>
@@ -506,6 +515,13 @@ Creates a ResModel instance
 | [opt] | <code>object</code> | Optional parameters. |
 | [opt.definition] | <code>object</code> | Object definition. If not provided, any value will be allowed. |
 
+<a name="ResModel+getClient"></a>
+
+### resModel.getClient() ⇒ [<code>ResClient</code>](#ResClient)
+ResClient instance.
+
+**Kind**: instance method of [<code>ResModel</code>](#ResModel)  
+**Returns**: [<code>ResClient</code>](#ResClient) - ResClient instance  
 <a name="ResModel+getResourceId"></a>
 
 ### resModel.getResourceId() ⇒ <code>string</code>
