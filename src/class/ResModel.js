@@ -32,6 +32,14 @@ class ResModel {
 	}
 
 	/**
+	 * ResClient instance.
+	 * @returns {ResClient} ResClient instance
+	 */
+	getClient() {
+		return this._api;
+	}
+
+	/**
 	 * Model resource ID
 	 * @returns {string} Resource ID
 	 */
