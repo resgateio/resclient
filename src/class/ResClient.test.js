@@ -145,10 +145,33 @@ describe("ResClient", () => {
 		return flushPromises();
 	}
 
-	function getServerResource(rid, data, collectionFactory) {
+	// Gets the resgate protocol version, while sending supported version.
+	function getVersion(resgateProtocol) {
+		resgateProtocol = resgateProtocol === undefined ? client.supportedProtocol : resgateProtocol;
+		return flushRequests().then(() => {
+			expect(server.error).toBe(null);
+			let req = server.getNextRequest();
+			expect(req).not.toBe(undefined);
+			expect(req.method).toBe('version');
+			expect(req.params).toEqual({ protocol: client.supportedProtocol });
+			if (!resgateProtocol) {
+				server.sendError(req, 'system.invalidRequest', "Invalid request");
+			} else {
+				server.sendResponse(req, { protocol: resgateProtocol });
+			}
+			return flushRequests();
+		});
+	}
+
+	function getServerResource(rid, data, collectionFactory, resgateProtocol) {
+		let isConnected = server.isConnected();
 		let promise = client.get(rid, collectionFactory);
 
-		return flushRequests().then(() => {
+		let p = isConnected
+			? flushRequests()
+			: getVersion(resgateProtocol);
+
+		return p.then(() => {
 			expect(server.error).toBe(null);
 			let req = server.getNextRequest();
 			expect(req).not.toBe(undefined);
@@ -191,19 +214,31 @@ describe("ResClient", () => {
 		it("connects on getResource", () => {
 			client.get('service.test');
 
-			return flushPromises().then(() => {
+			return getVersion().then(() => {
+				expect(server.error).toBe(null);
 				expect(server.isConnected()).toBe(true);
 			});
 		});
 
-		it("disconnects on disconnect", () => {
-			let promise = client.connect().then(() => {
-				client.disconnect();
-				jest.runAllTimers();
-				expect(server.isConnected()).toBe(false);
+		it("sends version request on getResource", () => {
+			client.get('service.test');
+
+			return flushRequests().then(() => {
+				let req = server.getNextRequest();
+				expect(req).not.toBe(undefined);
+				expect(req.method).toBe('version');
 			});
-			jest.runOnlyPendingTimers();
-			return promise;
+		});
+
+		it("disconnects on disconnect", () => {
+			let promise = client.connect();
+			return getVersion()
+				.then(promise)
+				.then(() => {
+					client.disconnect();
+					jest.runAllTimers();
+					expect(server.isConnected()).toBe(false);
+				});
 		});
 	});
 
@@ -214,7 +249,7 @@ describe("ResClient", () => {
 				expect(model.foo).toBe("bar");
 			});
 
-			return flushRequests().then(() => {
+			return getVersion().then(() => {
 				expect(server.error).toBe(null);
 				let req = server.getNextRequest();
 				expect(req).not.toBe(undefined);
@@ -270,7 +305,7 @@ describe("ResClient", () => {
 		it("rejects the promise on error", () => {
 			let promise = client.get('service.model');
 
-			return flushRequests().then(() => {
+			return getVersion().then(() => {
 				let req = server.getNextRequest();
 				server.sendError(req, 'system.notFound', "Not found");
 				jest.runOnlyPendingTimers();
@@ -300,7 +335,7 @@ describe("ResClient", () => {
 				expect(collection.atIndex(4)).toBe(null);
 			});
 
-			return flushRequests().then(() => {
+			return getVersion().then(() => {
 				let req = server.getNextRequest();
 				expect(req).not.toBe(undefined);
 				expect(req.method).toBe('subscribe.service.primitives');
@@ -321,7 +356,7 @@ describe("ResClient", () => {
 				expect(collection.atIndex(2).name).toBe("Thirty");
 			});
 
-			return flushRequests().then(() => {
+			return getVersion().then(() => {
 				let req = server.getNextRequest();
 				expect(req).not.toBe(undefined);
 				expect(req.method).toBe('subscribe.service.collection');
@@ -422,31 +457,29 @@ describe("ResClient", () => {
 
 		it("emits connect event on connect", () => {
 			client.on('connect', cb);
-			let promise = client.connect().then(() => {
+			let promise = client.connect();
+			return getVersion().then(promise).then(() => {
 				jest.runAllTimers();
 				expect(cb.mock.calls.length).toBe(1);
 				expect(typeof cb.mock.calls[0][0]).toBe('object');
 			});
-			jest.runOnlyPendingTimers();
-			return promise;
 		});
 
 		it("emits disconnect event on disconnect", () => {
 			client.on('disconnect', cb);
-			let promise = client.connect().then(() => {
+			let promise = client.connect();
+			return getVersion().then(promise).then(() => {
 				client.disconnect();
 				jest.runAllTimers();
 				expect(cb.mock.calls.length).toBe(1);
 				expect(typeof cb.mock.calls[0][0]).toBe('object');
 			});
-			jest.runOnlyPendingTimers();
-			return promise;
 		});
 
 		it("emits error event on error", () => {
 			client.on('error', cb);
 			let promise = client.get('service.model');
-			return flushRequests().then(() => {
+			return getVersion().then(() => {
 				let req = server.getNextRequest();
 				server.sendError(req, 'system.notFound', "Not found");
 				jest.runOnlyPendingTimers();
@@ -469,31 +502,27 @@ describe("ResClient", () => {
 		it("does not emits connect event after connect after calling off", () => {
 			client.on('connect', cb);
 			client.off('connect', cb);
-			let promise = client.connect().then(() => {
+			return getVersion().then(client.connect()).then(() => {
 				jest.runAllTimers();
 				expect(cb.mock.calls.length).toBe(0);
 			});
-			jest.runOnlyPendingTimers();
-			return promise;
 		});
 
 		it("does not emits disconnect event on disconnect after calling off", () => {
 			client.on('disconnect', cb);
 			client.off('disconnect', cb);
-			let promise = client.connect().then(() => {
+			return getVersion().then(client.connect()).then(() => {
 				client.disconnect();
 				jest.runAllTimers();
 				expect(cb.mock.calls.length).toBe(0);
 			});
-			jest.runOnlyPendingTimers();
-			return promise;
 		});
 
 		it("does not emits error event on error after calling off", () => {
 			client.on('error', cb);
 			client.off('error', cb);
 			let promise = client.get('service.model');
-			return flushRequests().then(() => {
+			return getVersion().then(() => {
 				let req = server.getNextRequest();
 				server.sendError(req, 'system.notFound', "Not found");
 				jest.runOnlyPendingTimers();
@@ -1040,7 +1069,7 @@ describe("ResClient", () => {
 				return flushPromises().then(() => {
 					server = new ResServer(oldUrl);
 
-					return waitAWhile().then(flushRequests).then(() => {
+					return waitAWhile().then(getVersion).then(() => {
 						expect(server.error).toBe(null);
 						let req = server.getNextRequest();
 						expect(req).not.toBe(undefined);
@@ -1065,7 +1094,7 @@ describe("ResClient", () => {
 				return flushPromises().then(() => {
 					server = new ResServer(oldUrl);
 
-					return waitAWhile().then(flushRequests).then(() => {
+					return waitAWhile().then(getVersion).then(() => {
 						let req = server.getNextRequest();
 						server.sendResponse(req, { models: {
 							'service.model': {
@@ -1098,7 +1127,7 @@ describe("ResClient", () => {
 				return flushPromises().then(() => {
 					server = new ResServer(oldUrl);
 
-					return waitAWhile().then(flushRequests).then(() => {
+					return waitAWhile().then(getVersion).then(() => {
 						let req = server.getNextRequest();
 						server.sendResponse(req, {
 							models: {
@@ -1142,8 +1171,10 @@ describe("ResClient", () => {
 		it("calls the setOnConnect callback after connect", () => {
 			client.setOnConnect(cb);
 			client.connect();
-			jest.runAllTimers();
-			expect(cb.mock.calls.length).toBe(1);
+			return getVersion().then(() => {
+				jest.runAllTimers();
+				expect(cb.mock.calls.length).toBe(1);
+			});
 		});
 
 		it("postpones any request until setOnConnect callback resolves", () => {
@@ -1152,15 +1183,14 @@ describe("ResClient", () => {
 
 			let promise = client.get('service.model');
 
-			return flushRequests().then(() => {
+			return getVersion().then(() => {
 				expect(server.pendingRequests()).toBe(1);
 				expect(server.error).toBe(null);
 				let req = server.getNextRequest();
 				expect(req.method).toBe('call.service.model.test');
-				server.sendResponse(req, null);
+				server.sendResponse(req, { payload: null });
 
 				return flushRequests().then(() => {
-
 					expect(server.error).toBe(null);
 					let req = server.getNextRequest();
 					expect(req).not.toBe(undefined);
@@ -1276,6 +1306,21 @@ describe("ResClient", () => {
 
 		it("resolves call promise on success", () => {
 			return getServerResource('service.model', modelResources).then(model => {
+				let promise = model.call('test');
+
+				return flushRequests().then(() => {
+					let req = server.getNextRequest();
+					server.sendResponse(req, { payload: { responseValue: true }});
+
+					return flushRequests().then(() => {
+						return expect(promise).resolves.toEqual({ responseValue: true });
+					});
+				});
+			});
+		});
+
+		it("resolves call promise on success with legacy resgate", () => {
+			return getServerResource('service.model', modelResources, null, null).then(model => {
 				let promise = model.call('test');
 
 				return flushRequests().then(() => {
