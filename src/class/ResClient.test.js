@@ -116,6 +116,12 @@ describe("ResClient", () => {
 			'service.primitives': primitiveCollectionData
 		}
 	};
+	const modelReferenceResources = {
+		rid: "service.model.ref",
+		models: {
+			"service.model.ref": modelData
+		}
+	};
 
 	function flushPromises(depth = 2) {
 		return new Promise(resolve => setImmediate(() => {
@@ -1269,28 +1275,97 @@ describe("ResClient", () => {
 
 	describe("ResModel", () => {
 
-		it("calls remote method on call with parameters", () => {
-			return getServerResource('service.model', modelResources).then(model => {
-				model.call('test', { zoo: "baz", value: 12 });
+		describe("call", () => {
 
-				return flushRequests().then(() => {
-					expect(server.pendingRequests()).toBe(1);
-					expect(server.error).toBe(null);
-					let req = server.getNextRequest();
-					expect(req.method).toBe('call.service.model.test');
-					expect(req.params).toEqual({ zoo: "baz", value: 12 });
+			it("calls remote method on call with parameters", () => {
+				return getServerResource('service.model', modelResources).then(model => {
+					model.call('test', { zoo: "baz", value: 12 });
+
+					return flushRequests().then(() => {
+						expect(server.pendingRequests()).toBe(1);
+						expect(server.error).toBe(null);
+						let req = server.getNextRequest();
+						expect(req.method).toBe('call.service.model.test');
+						expect(req.params).toEqual({ zoo: "baz", value: 12 });
+					});
 				});
 			});
-		});
 
-		it("calls remote method on call without parameters", () => {
-			return getServerResource('service.model', modelResources).then(model => {
-				model.call('test');
-				return flushRequests().then(() => {
-					let req = server.getNextRequest();
-					expect([ null, undefined ]).toContain(req.params);
+			it("calls remote method on call without parameters", () => {
+				return getServerResource('service.model', modelResources).then(model => {
+					model.call('test');
+					return flushRequests().then(() => {
+						let req = server.getNextRequest();
+						expect([ null, undefined ]).toContain(req.params);
+					});
 				});
 			});
+
+			it("resolves call promise on result payload", () => {
+				return getServerResource('service.model', modelResources).then(model => {
+					let promise = model.call('test');
+
+					return flushRequests().then(() => {
+						let req = server.getNextRequest();
+						server.sendResponse(req, { payload: { responseValue: true }});
+
+						return flushRequests().then(() => {
+							return expect(promise).resolves.toEqual({ responseValue: true });
+						});
+					});
+				});
+			});
+
+			it("resolves call promise on success with legacy resgate", () => {
+				return getServerResource('service.model', modelResources, null, null).then(model => {
+					let promise = model.call('test');
+
+					return flushRequests().then(() => {
+						let req = server.getNextRequest();
+						server.sendResponse(req, { responseValue: true });
+
+						return flushRequests().then(() => {
+							return expect(promise).resolves.toEqual({ responseValue: true });
+						});
+					});
+				});
+			});
+
+			it("rejects call promise on error", () => {
+				return getServerResource('service.model', modelResources).then(model => {
+					let promise = model.call('test');
+
+					return flushRequests().then(() => {
+						let req = server.getNextRequest();
+						expect(req).not.toBe(undefined);
+						server.sendError(req, 'service.testError', "Test error");
+
+						return expect(promise).rejects.toEqual(expect.objectContaining({
+							code: 'service.testError',
+							message: "Test error"
+						}));
+					});
+				});
+			});
+
+			it("resolves call promise on resource response", () => {
+				return getServerResource('service.model', modelResources).then(model => {
+					let promise = model.call('test');
+
+					return flushRequests().then(() => {
+						let req = server.getNextRequest();
+						server.sendResponse(req, modelReferenceResources);
+
+						return flushRequests()
+							.then(() => promise)
+							.then(m => {
+								expect(m).not.toBe(undefined);
+								expect(m.foo).toBe("bar");
+							});
+					});
+				});
+			});
+
 		});
 
 		it("calls set method on set", () => {
@@ -1300,53 +1375,6 @@ describe("ResClient", () => {
 					let req = server.getNextRequest();
 					expect(req.method).toBe('call.service.model.set');
 					expect(req.params).toEqual({ foo: "baz" });
-				});
-			});
-		});
-
-		it("resolves call promise on success", () => {
-			return getServerResource('service.model', modelResources).then(model => {
-				let promise = model.call('test');
-
-				return flushRequests().then(() => {
-					let req = server.getNextRequest();
-					server.sendResponse(req, { payload: { responseValue: true }});
-
-					return flushRequests().then(() => {
-						return expect(promise).resolves.toEqual({ responseValue: true });
-					});
-				});
-			});
-		});
-
-		it("resolves call promise on success with legacy resgate", () => {
-			return getServerResource('service.model', modelResources, null, null).then(model => {
-				let promise = model.call('test');
-
-				return flushRequests().then(() => {
-					let req = server.getNextRequest();
-					server.sendResponse(req, { responseValue: true });
-
-					return flushRequests().then(() => {
-						return expect(promise).resolves.toEqual({ responseValue: true });
-					});
-				});
-			});
-		});
-
-		it("rejects call promise on error", () => {
-			return getServerResource('service.model', modelResources).then(model => {
-				let promise = model.call('test');
-
-				return flushRequests().then(() => {
-					let req = server.getNextRequest();
-					expect(req).not.toBe(undefined);
-					server.sendError(req, 'service.testError', "Test error");
-
-					return expect(promise).rejects.toEqual(expect.objectContaining({
-						code: 'service.testError',
-						message: "Test error"
-					}));
 				});
 			});
 		});
@@ -1474,6 +1502,95 @@ describe("ResClient", () => {
 					{ id: 20, name: "Twenty" },
 					{ id: 30, name: "Thirty" }
 				]);
+			});
+		});
+
+		it("calls remote method on call with parameters", () => {
+			return getServerResource('service.collection', collectionResources).then(collection => {
+				collection.call('test', { zoo: "baz", value: 12 });
+
+				return flushRequests().then(() => {
+					expect(server.pendingRequests()).toBe(1);
+					expect(server.error).toBe(null);
+					let req = server.getNextRequest();
+					expect(req.method).toBe('call.service.collection.test');
+					expect(req.params).toEqual({ zoo: "baz", value: 12 });
+				});
+			});
+		});
+
+		it("calls remote method on call without parameters", () => {
+			return getServerResource('service.collection', collectionResources).then(collection => {
+				collection.call('test');
+				return flushRequests().then(() => {
+					let req = server.getNextRequest();
+					expect([ null, undefined ]).toContain(req.params);
+				});
+			});
+		});
+
+		it("resolves call promise on success", () => {
+			return getServerResource('service.collection', collectionResources).then(collection => {
+				let promise = collection.call('test');
+
+				return flushRequests().then(() => {
+					let req = server.getNextRequest();
+					server.sendResponse(req, { payload: { responseValue: true }});
+
+					return flushRequests().then(() => {
+						return expect(promise).resolves.toEqual({ responseValue: true });
+					});
+				});
+			});
+		});
+
+		it("resolves call promise on success with legacy resgate", () => {
+			return getServerResource('service.collection', collectionResources, null, null).then(collection => {
+				let promise = collection.call('test');
+
+				return flushRequests().then(() => {
+					let req = server.getNextRequest();
+					server.sendResponse(req, { responseValue: true });
+
+					return flushRequests().then(() => {
+						return expect(promise).resolves.toEqual({ responseValue: true });
+					});
+				});
+			});
+		});
+
+		it("rejects call promise on error", () => {
+			return getServerResource('service.collection', collectionResources).then(collection => {
+				let promise = collection.call('test');
+
+				return flushRequests().then(() => {
+					let req = server.getNextRequest();
+					expect(req).not.toBe(undefined);
+					server.sendError(req, 'service.testError', "Test error");
+
+					return expect(promise).rejects.toEqual(expect.objectContaining({
+						code: 'service.testError',
+						message: "Test error"
+					}));
+				});
+			});
+		});
+
+		it("resolves call promise on resource response", () => {
+			return getServerResource('service.collection', collectionResources).then(collection => {
+				let promise = collection.call('test');
+
+				return flushRequests().then(() => {
+					let req = server.getNextRequest();
+					server.sendResponse(req, modelReferenceResources);
+
+					return flushRequests()
+						.then(() => promise)
+						.then(m => {
+							expect(m).not.toBe(undefined);
+							expect(m.foo).toBe("bar");
+						});
+				});
 			});
 		});
 	});
