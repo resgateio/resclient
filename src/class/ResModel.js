@@ -29,6 +29,23 @@ class ResModel {
 
 		this._rid = rid;
 		this._api = api;
+		this._props = {};
+	}
+
+	/**
+	 * Model properties.
+	 * @returns {object} Anonymous object with all model properties.
+	 */
+	get props() {
+		return this._props;
+	}
+
+	/**
+	 * ResClient instance.
+	 * @returns {ResClient} ResClient instance
+	 */
+	getClient() {
+		return this._api;
 	}
 
 	/**
@@ -85,6 +102,16 @@ class ResModel {
 	}
 
 	/**
+	 * Calls an auth method on the model.
+	 * @param {string} method Auth method name
+	 * @param {*} params Method parameters
+	 * @returns {Promise.<object>} Promise of the auth result.
+	 */
+	auth(method, params) {
+		return this._api.authenticate(this._rid, method, params);
+	}
+
+	/**
 	 * Initializes the model with a data object.
 	 * Should only be called by the ResClient instance.
 	 * @param {object} data Data object
@@ -107,24 +134,33 @@ class ResModel {
 		}
 
 		let changed = null;
-		let v;
+		let v, promote;
+		let p = this._props;
 		if (this._definition) {
-			changed = obj.update(this, props, this._definition);
+			changed = obj.update(p, props, this._definition);
+			for (let key in changed) {
+				if ((this.hasOwnProperty(key) || !this[key]) && key[0] !== '_') {
+					v = p[key];
+					if (v === undefined) {
+						delete this[key];
+					} else {
+						this[key] = v;
+					}
+				}
+			}
 		} else {
 			for (let key in props) {
-				if (props.hasOwnProperty(key) &&
-					key.substr(0, 1) !== '_' &&
-					(this.hasOwnProperty(key) || !this[key])
-				) {
-					v = props[key];
-					if (v !== this[key]) {
-						changed = changed || {};
-						changed[key] = this[key];
-						if (v === undefined) {
-							delete this[key];
-						} else {
-							this[key] = v;
-						}
+				v = props[key];
+				promote = (this.hasOwnProperty(key) || !this[key]) && key[0] !== '_';
+				if (v !== p[key]) {
+					changed = changed || {};
+					changed[key] = p[key];
+					if (v === undefined) {
+						delete p[key];
+						if (promote) delete this[key];
+					} else {
+						p[key] = v;
+						if (promote) this[key] = v;
 					}
 				}
 			}
@@ -134,21 +170,11 @@ class ResModel {
 	}
 
 	toJSON() {
-		let o, v;
-		if (this._definition) {
-			o = obj.copy(this, this._definition);
-		} else {
-			o = {};
-			for (let key in this) {
-				if (this.hasOwnProperty(key) &&
-					key.substr(0, 1) !== '_'
-				) {
-					o[key] = this[key];
-				}
-			}
-		}
+		let o = this._definition
+			? obj.copy(this._props, this._definition)
+			: this._props;
 		for (let k in o) {
-			v = o[k];
+			var v = o[k];
 			if (typeof v === 'object' && v !== null && v.toJSON) {
 				o[k] = v.toJSON();
 			}

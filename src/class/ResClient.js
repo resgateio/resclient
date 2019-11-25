@@ -17,6 +17,16 @@ const errorFactory = function(api, rid) {
 	return new ResError(rid);
 };
 
+const versionToInt = function(version) {
+	if (!version) return 0;
+	let p = version.split('.');
+	let v = 0;
+	for (let i = 0; i < 3; i++) {
+		v = v * 1000 + Number(p[i]);
+	}
+	return v;
+};
+
 // Resource types
 const typeCollection = 'collection';
 const typeModel = 'model';
@@ -33,22 +43,55 @@ const stateNone = 0;
 const stateDelete = 1;
 const stateKeep = 2;
 const stateStale = 3;
+// RES Protocol version
+const legacyProtocol = versionToInt("1.1.1");
+const supportedProtocol = "1.2.0";
 
 /**
- * ResClient is a client implementing the RES-Client protocol.
+ * Connect event emitted on connect.
+ * @callback ResClient~connectCallback
+ * @param {object} event WebSocket open event object
+ */
+
+/**
+ * Disconnect event emitted on disconnect.
+ * @callback ResClient~disconnectCallback
+ * @param {object} event WebSocket close event object
+ */
+
+/**
+ * Error event emitted on error.
+ * @callback ResClient~errorCallback
+ * @param {ResError} err ResError object
+ */
+
+/**
+ * WebSocket factory function.
+ * @callback ResClient~websocketFactory
+ * @returns {WebSocket} WebSocket instance implementing the [WebSocket API]{@link https://developer.mozilla.org/en-US/docs/Web/API/WebSocket}.
+ */
+
+/**
+ * ResClient represents a client connection to a RES API.
  */
 class ResClient {
 
 	/**
 	 * Creates a ResClient instance
-	 * @param {string} hostUrl Websocket host path. May be relative to current path.
+	 * @param {string|ResClient~websocketFactory} hostUrlOrFactory Websocket host path, or websocket factory function. Path may be relative to current path.
 	 * @param {object} [opt] Optional parameters.
 	 * @param {function} [opt.onConnect] On connect callback called prior resolving the connect promise and subscribing to stale resources. May return a promise.
 	 * @param {string} [opt.namespace] Event bus namespace. Defaults to 'resclient'.
 	 * @param {module:modapp~EventBus} [opt.eventBus] Event bus.
 	 */
-	constructor(hostUrl, opt) {
-		this.hostUrl = this._resolvePath(hostUrl);
+	constructor(hostUrlOrFactory, opt) {
+		this.hostUrl = null;
+		if (typeof hostUrlOrFactory == 'function') {
+			this.wsFactory = hostUrlOrFactory;
+		} else {
+			this.hostUrl = this._resolvePath(hostUrlOrFactory);
+			this.wsFactory = () => new WebSocket(this.hostUrl);
+		}
 		obj.update(this, opt, {
 			onConnect: { type: '?function' },
 			namespace: { type: 'string', default: defaultNamespace },
@@ -121,6 +164,14 @@ class ResClient {
 	}
 
 	/**
+	 * RES protocol level supported by this client version.
+	 * @returns {string} Supported RES protocol version.
+	 */
+	get supportedProtocol() {
+		return supportedProtocol;
+	}
+
+	/**
 	 * Connects the instance to the server.
 	 * Can be called even if a connection is already established.
 	 * @returns {Promise} A promise to the established connection.
@@ -130,7 +181,7 @@ class ResClient {
 
 		return this.connectPromise = this.connectPromise || new Promise((resolve, reject) => {
 			this.connectCallback = { resolve, reject };
-			this.ws = new WebSocket(this.hostUrl);
+			this.ws = this.wsFactory();
 
 			this.ws.onopen = this._handleOnopen;
 			this.ws.onerror = this._handleOnerror;
@@ -161,18 +212,20 @@ class ResClient {
 	}
 
 	/**
-	 * Attach an  event handler function for one or more instance events.
+	 * Attach an event handler function for one or more instance events.
+	 * Available events are 'connect', 'disconnect', and 'error'.
 	 * @param {?string} events One or more space-separated events. Null means any event.
-	 * @param {eventCallback} handler A function to execute when the event is emitted.
+	 * @param {ResClient~connectCallback|ResClient~disconnectCallback|ResClient~errorCallback} handler Handler function to execute when the event is emitted.
 	 */
 	on(events, handler) {
 		this.eventBus.on(this, events, handler, this.namespace);
 	}
 
-	 /**
+	/**
 	 * Remove an instance event handler.
+	 * Available events are 'connect', 'disconnect', and 'error'.
 	 * @param {?string} events One or more space-separated events. Null means any event.
-	 * @param {eventCallback} [handler] An optional handler function. The handler will only be remove if it is the same handler.
+	 * @param {ResClient~connectCallback|ResClient~disconnectCallback|ResClient~errorCallback} [handler] Handler function to remove.
 	 */
 	off(events, handler) {
 		this.eventBus.off(this, events, handler, this.namespace);
@@ -189,10 +242,11 @@ class ResClient {
 	}
 
 	/**
-	 * Resource factory callback
-	 * @callback resourceFactoryCallback
+	 * Model factory callback
+	 * @callback ResClient~modelFactory
 	 * @param {ResClient} api ResClient instance
 	 * @param {string} rid Resource ID
+	 * @returns {ResModel} Model instance object.
 	 */
 
 	/**
@@ -201,7 +255,7 @@ class ResClient {
 	 * * The asterisk (*) matches any part at any level of the resource name.
 	 * * The greater than symbol (>) matches one or more parts at the end of a resource name, and must be the last part.
 	 * @param {string} pattern Pattern of the model type.
-	 * @param {resourceFactoryCallback} factory Model factory callback
+	 * @param {ResClient~modelFactory} factory Model factory callback
 	 */
 	registerModelType(pattern, factory) {
 		this.types.model.list.addFactory(pattern, factory);
@@ -210,11 +264,19 @@ class ResClient {
 	/**
 	 * Unregister a previously registered model type pattern.
 	 * @param {string} pattern Pattern of the model type.
-	 * @returns {resourceFactoryCallback} Unregistered model factory callback
+	 * @returns {ResClient~modelFactory} Unregistered model factory callback
 	 */
 	unregisterModelType(pattern) {
 		return this.types.model.list.removeFactory(pattern);
 	}
+
+	/**
+	 * Collection factory callback
+	 * @callback ResClient~collectionFactory
+	 * @param {ResClient} api ResClient instance
+	 * @param {string} rid Resource ID
+	 * @returns {ResCollection} Collection instance object.
+	 */
 
 	/**
 	 * Register a collection type.
@@ -222,7 +284,7 @@ class ResClient {
 	 * * The asterisk (*) matches any part at any level of the resource name.
 	 * * The greater than symbol (>) matches one or more parts at the end of a resource name, and must be the last part.
 	 * @param {string} pattern Pattern of the collection type.
-	 * @param {ResClient~resourceFactoryCallback} factory Collection factory callback
+	 * @param {ResClient~collectionFactory} factory Collection factory callback
 	 */
 	registerCollectionType(pattern, factory) {
 		this.types.collection.list.addFactory(pattern, factory);
@@ -231,7 +293,7 @@ class ResClient {
 	/**
 	 * Unregister a previously registered collection type pattern.
 	 * @param {string} pattern Pattern of the collection type.
-	 * @returns {resourceFactoryCallback} Unregistered collection factory callback
+	 * @returns {ResClient~collectionFactory} Unregistered collection factory callback
 	 */
 	unregisterCollectionType(pattern) {
 		return this.types.model.list.removeFactory(pattern);
@@ -266,7 +328,7 @@ class ResClient {
 	 * @returns {Promise.<object>} Promise of the call result.
 	 */
 	call(rid, method, params) {
-		return this._send('call', rid, method || '', params);
+		return this._call('call', rid, method, params);
 	}
 
 	/**
@@ -277,20 +339,22 @@ class ResClient {
 	 * @returns {Promise.<object>} Promise of the authentication result.
 	 */
 	authenticate(rid, method, params) {
-		return this._send('auth', rid, method || '', params);
+		return this._call('auth', rid, method, params);
 	}
-
+ 
 	/**
-	 * Creates a new resource by calling the 'new' method.
+	 * Creates a new resource by calling the 'new' method.  
+	 * Use call with 'new' as method parameter instead.
 	 * @param {*} rid Resource ID
 	 * @param {*} params Method parameters
 	 * @return {Promise.<(ResModel|ResCollection)>} Promise of the resource.
+	 * @deprecated since version 2.1.0. Use call with 'new' as method parameter instead.
 	 */
 	create(rid, params) {
 		return this._send('new', rid, null, params)
-			.then(response => {
-				this._cacheResources(response);
-				let ci = this.cache[response.rid];
+			.then(result => {
+				this._cacheResources(result);
+				let ci = this.cache[result.rid];
 				ci.setSubscribed(true);
 				return ci.item;
 			});
@@ -406,6 +470,23 @@ class ResClient {
 		} else {
 			throw new Error("Invalid message from server: " + json);
 		}
+	}
+
+	_call(type, rid, method, params) {
+		return this._send(type, rid, method || '', params)
+			.then(result => {
+				// Legacy v1.1.1 behavior
+				if (this.protocol <= legacyProtocol) {
+					return result;
+				}
+				if (result.rid) {
+					this._cacheResources(result);
+					let ci = this.cache[result.rid];
+					ci.setSubscribed(true);
+					return ci.item;
+				}
+				return result.payload;
+			});
 	}
 
 	_handleErrorResponse(req, data) {
@@ -653,7 +734,20 @@ class ResClient {
 	_handleOnopen(e) {
 		this.connected = true;
 
-		Promise.resolve(this.onConnect ? this.onConnect() : null)
+		this._sendNow('version', { protocol: this.supportedProtocol })
+			.then(ver => {
+				this.protocol = versionToInt(ver.protocol) || legacyProtocol;
+			})
+			.catch(err => {
+				// Invalid error means the gateway doesn't support
+				// version requests. Default to legacy protocol.
+				if (err.code && err.code == 'system.invalidRequest') {
+					this.protocol = legacyProtocol;
+					return;
+				}
+				throw err;
+			})
+			.then(() => this.onConnect ? this.onConnect() : null)
 			.then(() => {
 				this._subscribeToAllStale();
 				this._emit('connect', e);
@@ -705,7 +799,7 @@ class ResClient {
 				}
 			}
 
-			this._emit('close', e);
+			this._emit('disconnect', e);
 		}
 
 		let hasStale = false;
@@ -747,8 +841,8 @@ class ResClient {
 		}
 	}
 
-	_emit(event, data, ctx) {
-		this.eventBus.emit(event, data, this.namespace);
+	_emit(event, data) {
+		this.eventBus.emit(this, event, data, this.namespace);
 	}
 
 	/**

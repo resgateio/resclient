@@ -59,6 +59,14 @@ class ResCollection {
 	}
 
 	/**
+	 * ResClient instance.
+	 * @returns {ResClient} ResClient instance
+	 */
+	getClient() {
+		return this._api;
+	}
+
+	/**
 	 * Collection resource ID
 	 * @returns {string} Resource ID
 	 */
@@ -136,6 +144,16 @@ class ResCollection {
 	 */
 	call(method, params) {
 		return this._api.call(this._rid, method, params);
+	}
+
+	/**
+	 * Calls an auth method on the collection.
+	 * @param {string} method Auth method name
+	 * @param {*} params Method parameters
+	 * @returns {Promise.<object>} Promise of the auth result.
+	 */
+	auth(method, params) {
+		return this._api.authenticate(this._rid, method, params);
 	}
 
 	/**

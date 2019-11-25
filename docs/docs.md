@@ -2,7 +2,7 @@
 
 <dl>
 <dt><a href="#ResClient">ResClient</a></dt>
-<dd><p>ResClient is a client implementing the RES-Client protocol.</p>
+<dd><p>ResClient represents a client connection to a RES API.</p>
 </dd>
 <dt><a href="#ResCollection">ResCollection</a></dt>
 <dd><p>ResCollection represents a collection provided over the RES API.</p>
@@ -18,9 +18,6 @@
 ## Typedefs
 
 <dl>
-<dt><a href="#resourceFactoryCallback">resourceFactoryCallback</a> : <code>function</code></dt>
-<dd><p>Resource factory callback</p>
-</dd>
 <dt><a href="#eventCallback">eventCallback</a> : <code>function</code></dt>
 <dd><p>Event callback</p>
 </dd>
@@ -29,42 +26,58 @@
 <a name="ResClient"></a>
 
 ## ResClient
-ResClient is a client implementing the RES-Client protocol.
+ResClient represents a client connection to a RES API.
 
 **Kind**: global class  
 
 * [ResClient](#ResClient)
-    * [new ResClient(hostUrl, [opt])](#new_ResClient_new)
-    * [.connect()](#ResClient+connect) ⇒ <code>Promise</code>
-    * [.disconnect()](#ResClient+disconnect)
-    * [.getHostUrl()](#ResClient+getHostUrl) ⇒ <code>string</code>
-    * [.on(events, handler)](#ResClient+on)
-    * [.off(events, [handler])](#ResClient+off)
-    * [.setOnConnect(onConnect)](#ResClient+setOnConnect) ⇒ <code>this</code>
-    * [.registerModelType(pattern, factory)](#ResClient+registerModelType)
-    * [.unregisterModelType(pattern)](#ResClient+unregisterModelType) ⇒ [<code>resourceFactoryCallback</code>](#resourceFactoryCallback)
-    * [.registerCollectionType(pattern, factory)](#ResClient+registerCollectionType)
-    * [.unregisterCollectionType(pattern)](#ResClient+unregisterCollectionType) ⇒ [<code>resourceFactoryCallback</code>](#resourceFactoryCallback)
-    * [.get(rid, [collectionFactory])](#ResClient+get) ⇒ <code>Promise.&lt;(ResModel\|ResCollection)&gt;</code>
-    * [.call(rid, method, params)](#ResClient+call) ⇒ <code>Promise.&lt;object&gt;</code>
-    * [.authenticate(rid, method, params)](#ResClient+authenticate) ⇒ <code>Promise.&lt;object&gt;</code>
-    * [.create(rid, params)](#ResClient+create) ⇒ <code>Promise.&lt;(ResModel\|ResCollection)&gt;</code>
-    * [.setModel(modelId, props)](#ResClient+setModel) ⇒ <code>Promise.&lt;object&gt;</code>
+    * [new ResClient(hostUrlOrFactory, [opt])](#new_ResClient_new)
+    * _instance_
+        * [.supportedProtocol](#ResClient+supportedProtocol) ⇒ <code>string</code>
+        * [.connect()](#ResClient+connect) ⇒ <code>Promise</code>
+        * [.disconnect()](#ResClient+disconnect)
+        * [.getHostUrl()](#ResClient+getHostUrl) ⇒ <code>string</code>
+        * [.on(events, handler)](#ResClient+on)
+        * [.off(events, [handler])](#ResClient+off)
+        * [.setOnConnect(onConnect)](#ResClient+setOnConnect) ⇒ <code>this</code>
+        * [.registerModelType(pattern, factory)](#ResClient+registerModelType)
+        * [.unregisterModelType(pattern)](#ResClient+unregisterModelType) ⇒ [<code>modelFactory</code>](#ResClient..modelFactory)
+        * [.registerCollectionType(pattern, factory)](#ResClient+registerCollectionType)
+        * [.unregisterCollectionType(pattern)](#ResClient+unregisterCollectionType) ⇒ [<code>collectionFactory</code>](#ResClient..collectionFactory)
+        * [.get(rid, [collectionFactory])](#ResClient+get) ⇒ <code>Promise.&lt;(ResModel\|ResCollection)&gt;</code>
+        * [.call(rid, method, params)](#ResClient+call) ⇒ <code>Promise.&lt;object&gt;</code>
+        * [.authenticate(rid, method, params)](#ResClient+authenticate) ⇒ <code>Promise.&lt;object&gt;</code>
+        * ~~[.create(rid, params)](#ResClient+create) ⇒ <code>Promise.&lt;(ResModel\|ResCollection)&gt;</code>~~
+        * [.setModel(modelId, props)](#ResClient+setModel) ⇒ <code>Promise.&lt;object&gt;</code>
+    * _inner_
+        * [~connectCallback](#ResClient..connectCallback) : <code>function</code>
+        * [~disconnectCallback](#ResClient..disconnectCallback) : <code>function</code>
+        * [~errorCallback](#ResClient..errorCallback) : <code>function</code>
+        * [~websocketFactory](#ResClient..websocketFactory) ⇒ <code>WebSocket</code>
+        * [~modelFactory](#ResClient..modelFactory) ⇒ [<code>ResModel</code>](#ResModel)
+        * [~collectionFactory](#ResClient..collectionFactory) ⇒ [<code>ResCollection</code>](#ResCollection)
 
 <a name="new_ResClient_new"></a>
 
-### new ResClient(hostUrl, [opt])
+### new ResClient(hostUrlOrFactory, [opt])
 Creates a ResClient instance
 
 
 | Param | Type | Description |
 | --- | --- | --- |
-| hostUrl | <code>string</code> | Websocket host path. May be relative to current path. |
+| hostUrlOrFactory | <code>string</code> \| [<code>websocketFactory</code>](#ResClient..websocketFactory) | Websocket host path, or websocket factory function. Path may be relative to current path. |
 | [opt] | <code>object</code> | Optional parameters. |
 | [opt.onConnect] | <code>function</code> | On connect callback called prior resolving the connect promise and subscribing to stale resources. May return a promise. |
 | [opt.namespace] | <code>string</code> | Event bus namespace. Defaults to 'resclient'. |
 | [opt.eventBus] | <code>module:modapp~EventBus</code> | Event bus. |
 
+<a name="ResClient+supportedProtocol"></a>
+
+### resClient.supportedProtocol ⇒ <code>string</code>
+RES protocol level supported by this client version.
+
+**Kind**: instance property of [<code>ResClient</code>](#ResClient)  
+**Returns**: <code>string</code> - Supported RES protocol version.  
 <a name="ResClient+connect"></a>
 
 ### resClient.connect() ⇒ <code>Promise</code>
@@ -90,26 +103,28 @@ Gets the host URL to the RES API
 <a name="ResClient+on"></a>
 
 ### resClient.on(events, handler)
-Attach an  event handler function for one or more instance events.
+Attach an event handler function for one or more instance events.
+Available events are 'connect', 'disconnect', and 'error'.
 
 **Kind**: instance method of [<code>ResClient</code>](#ResClient)  
 
 | Param | Type | Description |
 | --- | --- | --- |
 | events | <code>string</code> | One or more space-separated events. Null means any event. |
-| handler | [<code>eventCallback</code>](#eventCallback) | A function to execute when the event is emitted. |
+| handler | [<code>connectCallback</code>](#ResClient..connectCallback) \| [<code>disconnectCallback</code>](#ResClient..disconnectCallback) \| [<code>errorCallback</code>](#ResClient..errorCallback) | Handler function to execute when the event is emitted. |
 
 <a name="ResClient+off"></a>
 
 ### resClient.off(events, [handler])
 Remove an instance event handler.
+Available events are 'connect', 'disconnect', and 'error'.
 
 **Kind**: instance method of [<code>ResClient</code>](#ResClient)  
 
 | Param | Type | Description |
 | --- | --- | --- |
 | events | <code>string</code> | One or more space-separated events. Null means any event. |
-| [handler] | [<code>eventCallback</code>](#eventCallback) | An optional handler function. The handler will only be remove if it is the same handler. |
+| [handler] | [<code>connectCallback</code>](#ResClient..connectCallback) \| [<code>disconnectCallback</code>](#ResClient..disconnectCallback) \| [<code>errorCallback</code>](#ResClient..errorCallback) | Handler function to remove. |
 
 <a name="ResClient+setOnConnect"></a>
 
@@ -135,15 +150,15 @@ The pattern may use the following wild cards:
 | Param | Type | Description |
 | --- | --- | --- |
 | pattern | <code>string</code> | Pattern of the model type. |
-| factory | [<code>resourceFactoryCallback</code>](#resourceFactoryCallback) | Model factory callback |
+| factory | [<code>modelFactory</code>](#ResClient..modelFactory) | Model factory callback |
 
 <a name="ResClient+unregisterModelType"></a>
 
-### resClient.unregisterModelType(pattern) ⇒ [<code>resourceFactoryCallback</code>](#resourceFactoryCallback)
+### resClient.unregisterModelType(pattern) ⇒ [<code>modelFactory</code>](#ResClient..modelFactory)
 Unregister a previously registered model type pattern.
 
 **Kind**: instance method of [<code>ResClient</code>](#ResClient)  
-**Returns**: [<code>resourceFactoryCallback</code>](#resourceFactoryCallback) - Unregistered model factory callback  
+**Returns**: [<code>modelFactory</code>](#ResClient..modelFactory) - Unregistered model factory callback  
 
 | Param | Type | Description |
 | --- | --- | --- |
@@ -162,15 +177,15 @@ The pattern may use the following wild cards:
 | Param | Type | Description |
 | --- | --- | --- |
 | pattern | <code>string</code> | Pattern of the collection type. |
-| factory | <code>ResClient~resourceFactoryCallback</code> | Collection factory callback |
+| factory | [<code>collectionFactory</code>](#ResClient..collectionFactory) | Collection factory callback |
 
 <a name="ResClient+unregisterCollectionType"></a>
 
-### resClient.unregisterCollectionType(pattern) ⇒ [<code>resourceFactoryCallback</code>](#resourceFactoryCallback)
+### resClient.unregisterCollectionType(pattern) ⇒ [<code>collectionFactory</code>](#ResClient..collectionFactory)
 Unregister a previously registered collection type pattern.
 
 **Kind**: instance method of [<code>ResClient</code>](#ResClient)  
-**Returns**: [<code>resourceFactoryCallback</code>](#resourceFactoryCallback) - Unregistered collection factory callback  
+**Returns**: [<code>collectionFactory</code>](#ResClient..collectionFactory) - Unregistered collection factory callback  
 
 | Param | Type | Description |
 | --- | --- | --- |
@@ -219,8 +234,11 @@ Invokes a authentication method on a resource.
 
 <a name="ResClient+create"></a>
 
-### resClient.create(rid, params) ⇒ <code>Promise.&lt;(ResModel\|ResCollection)&gt;</code>
-Creates a new resource by calling the 'new' method.
+### ~~resClient.create(rid, params) ⇒ <code>Promise.&lt;(ResModel\|ResCollection)&gt;</code>~~
+***Deprecated***
+
+Creates a new resource by calling the 'new' method.  
+Use call with 'new' as method parameter instead.
 
 **Kind**: instance method of [<code>ResClient</code>](#ResClient)  
 **Returns**: <code>Promise.&lt;(ResModel\|ResCollection)&gt;</code> - Promise of the resource.  
@@ -243,6 +261,72 @@ Calls the set method to update model properties.
 | modelId | <code>string</code> | Model resource ID. |
 | props | <code>object</code> | Properties. Set value to undefined to delete a property. |
 
+<a name="ResClient..connectCallback"></a>
+
+### ResClient~connectCallback : <code>function</code>
+Connect event emitted on connect.
+
+**Kind**: inner typedef of [<code>ResClient</code>](#ResClient)  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| event | <code>object</code> | WebSocket open event object |
+
+<a name="ResClient..disconnectCallback"></a>
+
+### ResClient~disconnectCallback : <code>function</code>
+Disconnect event emitted on disconnect.
+
+**Kind**: inner typedef of [<code>ResClient</code>](#ResClient)  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| event | <code>object</code> | WebSocket close event object |
+
+<a name="ResClient..errorCallback"></a>
+
+### ResClient~errorCallback : <code>function</code>
+Error event emitted on error.
+
+**Kind**: inner typedef of [<code>ResClient</code>](#ResClient)  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| err | [<code>ResError</code>](#ResError) | ResError object |
+
+<a name="ResClient..websocketFactory"></a>
+
+### ResClient~websocketFactory ⇒ <code>WebSocket</code>
+WebSocket factory function.
+
+**Kind**: inner typedef of [<code>ResClient</code>](#ResClient)  
+**Returns**: <code>WebSocket</code> - WebSocket instance implementing the [WebSocket API](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket).  
+<a name="ResClient..modelFactory"></a>
+
+### ResClient~modelFactory ⇒ [<code>ResModel</code>](#ResModel)
+Model factory callback
+
+**Kind**: inner typedef of [<code>ResClient</code>](#ResClient)  
+**Returns**: [<code>ResModel</code>](#ResModel) - Model instance object.  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| api | [<code>ResClient</code>](#ResClient) | ResClient instance |
+| rid | <code>string</code> | Resource ID |
+
+<a name="ResClient..collectionFactory"></a>
+
+### ResClient~collectionFactory ⇒ [<code>ResCollection</code>](#ResCollection)
+Collection factory callback
+
+**Kind**: inner typedef of [<code>ResClient</code>](#ResClient)  
+**Returns**: [<code>ResCollection</code>](#ResCollection) - Collection instance object.  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| api | [<code>ResClient</code>](#ResClient) | ResClient instance |
+| rid | <code>string</code> | Resource ID |
+
 <a name="ResCollection"></a>
 
 ## ResCollection
@@ -255,6 +339,7 @@ ResCollection represents a collection provided over the RES API.
     * [new ResCollection(api, rid, [opt])](#new_ResCollection_new)
     * _instance_
         * [.length](#ResCollection+length)
+        * [.getClient()](#ResCollection+getClient) ⇒ [<code>ResClient</code>](#ResClient)
         * [.getResourceId()](#ResCollection+getResourceId) ⇒ <code>string</code>
         * [.on([events], [handler])](#ResCollection+on) ⇒ <code>this</code>
         * [.off([events], [handler])](#ResCollection+off) ⇒ <code>this</code>
@@ -262,6 +347,7 @@ ResCollection represents a collection provided over the RES API.
         * [.indexOf(item)](#ResCollection+indexOf) ⇒ <code>number</code>
         * [.atIndex(idx)](#ResCollection+atIndex) ⇒ <code>\*</code>
         * [.call(method, params)](#ResCollection+call) ⇒ <code>Promise.&lt;object&gt;</code>
+        * [.auth(method, params)](#ResCollection+auth) ⇒ <code>Promise.&lt;object&gt;</code>
         * [.toArray()](#ResCollection+toArray) ⇒ <code>Array.&lt;\*&gt;</code>
     * _inner_
         * [~addCallback](#ResCollection..addCallback) : <code>function</code>
@@ -288,6 +374,13 @@ Creates an ResCollection instance
 Length of the collection
 
 **Kind**: instance property of [<code>ResCollection</code>](#ResCollection)  
+<a name="ResCollection+getClient"></a>
+
+### resCollection.getClient() ⇒ [<code>ResClient</code>](#ResClient)
+ResClient instance.
+
+**Kind**: instance method of [<code>ResCollection</code>](#ResCollection)  
+**Returns**: [<code>ResClient</code>](#ResClient) - ResClient instance  
 <a name="ResCollection+getResourceId"></a>
 
 ### resCollection.getResourceId() ⇒ <code>string</code>
@@ -373,6 +466,19 @@ Calls a method on the collection.
 | method | <code>string</code> | Method name |
 | params | <code>\*</code> | Method parameters |
 
+<a name="ResCollection+auth"></a>
+
+### resCollection.auth(method, params) ⇒ <code>Promise.&lt;object&gt;</code>
+Calls an auth method on the collection.
+
+**Kind**: instance method of [<code>ResCollection</code>](#ResCollection)  
+**Returns**: <code>Promise.&lt;object&gt;</code> - Promise of the auth result.  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| method | <code>string</code> | Auth method name |
+| params | <code>\*</code> | Method parameters |
+
 <a name="ResCollection+toArray"></a>
 
 ### resCollection.toArray() ⇒ <code>Array.&lt;\*&gt;</code>
@@ -445,11 +551,14 @@ ResModel represents a model provided over the RES API.
 * [ResModel](#ResModel)
     * [new ResModel(api, rid, [opt])](#new_ResModel_new)
     * _instance_
+        * [.props](#ResModel+props) ⇒ <code>object</code>
+        * [.getClient()](#ResModel+getClient) ⇒ [<code>ResClient</code>](#ResClient)
         * [.getResourceId()](#ResModel+getResourceId) ⇒ <code>string</code>
         * [.on([events], [handler])](#ResModel+on) ⇒ <code>this</code>
         * [.off(events, [handler])](#ResModel+off) ⇒ <code>this</code>
         * [.set(props)](#ResModel+set) ⇒ <code>Promise.&lt;object&gt;</code>
         * [.call(method, params)](#ResModel+call) ⇒ <code>Promise.&lt;object&gt;</code>
+        * [.auth(method, params)](#ResModel+auth) ⇒ <code>Promise.&lt;object&gt;</code>
     * _inner_
         * [~changeCallback](#ResModel..changeCallback) : <code>function</code>
 
@@ -466,6 +575,20 @@ Creates a ResModel instance
 | [opt] | <code>object</code> | Optional parameters. |
 | [opt.definition] | <code>object</code> | Object definition. If not provided, any value will be allowed. |
 
+<a name="ResModel+props"></a>
+
+### resModel.props ⇒ <code>object</code>
+Model properties.
+
+**Kind**: instance property of [<code>ResModel</code>](#ResModel)  
+**Returns**: <code>object</code> - Anonymous object with all model properties.  
+<a name="ResModel+getClient"></a>
+
+### resModel.getClient() ⇒ [<code>ResClient</code>](#ResClient)
+ResClient instance.
+
+**Kind**: instance method of [<code>ResModel</code>](#ResModel)  
+**Returns**: [<code>ResClient</code>](#ResClient) - ResClient instance  
 <a name="ResModel+getResourceId"></a>
 
 ### resModel.getResourceId() ⇒ <code>string</code>
@@ -526,6 +649,19 @@ Calls a method on the model.
 | method | <code>string</code> | Method name |
 | params | <code>\*</code> | Method parameters |
 
+<a name="ResModel+auth"></a>
+
+### resModel.auth(method, params) ⇒ <code>Promise.&lt;object&gt;</code>
+Calls an auth method on the model.
+
+**Kind**: instance method of [<code>ResModel</code>](#ResModel)  
+**Returns**: <code>Promise.&lt;object&gt;</code> - Promise of the auth result.  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| method | <code>string</code> | Auth method name |
+| params | <code>\*</code> | Method parameters |
+
 <a name="ResModel..changeCallback"></a>
 
 ### ResModel~changeCallback : <code>function</code>
@@ -578,18 +714,6 @@ Error resource ID
 
 **Kind**: instance method of [<code>ResError</code>](#ResError)  
 **Returns**: <code>string</code> - Resource ID  
-<a name="resourceFactoryCallback"></a>
-
-## resourceFactoryCallback : <code>function</code>
-Resource factory callback
-
-**Kind**: global typedef  
-
-| Param | Type | Description |
-| --- | --- | --- |
-| api | [<code>ResClient</code>](#ResClient) | ResClient instance |
-| rid | <code>string</code> | Resource ID |
-
 <a name="eventCallback"></a>
 
 ## eventCallback : <code>function</code>
