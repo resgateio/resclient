@@ -139,6 +139,16 @@ class ResCollection {
 	}
 
 	/**
+	 * Calls an auth method on the collection.
+	 * @param {string} method Auth method name
+	 * @param {*} params Method parameters
+	 * @returns {Promise.<object>} Promise of the auth result.
+	 */
+	auth(method, params) {
+		return this._api.authenticate(this._rid, method, params);
+	}
+
+	/**
 	 * Returns a shallow clone of the internal array.
 	 * @returns {Array.<*>} Clone of internal array
 	 */
