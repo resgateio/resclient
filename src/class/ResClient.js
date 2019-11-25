@@ -65,22 +65,33 @@ const supportedProtocol = "1.2.0";
  * @param {ResError} err ResError object
  */
 
+/**
+ * WebSocket factory function.
+ * @callback ResClient~websocketFactory
+ * @returns {WebSocket} WebSocket instance implementing the [WebSocket API]{@link https://developer.mozilla.org/en-US/docs/Web/API/WebSocket}.
+ */
 
 /**
- * ResClient is a client implementing the RES-Client protocol.
+ * ResClient represents a client connection to a RES API.
  */
 class ResClient {
 
 	/**
 	 * Creates a ResClient instance
-	 * @param {string} hostUrl Websocket host path. May be relative to current path.
+	 * @param {string|ResClient~websocketFactory} hostUrlOrFactory Websocket host path, or websocket factory function. Path may be relative to current path.
 	 * @param {object} [opt] Optional parameters.
 	 * @param {function} [opt.onConnect] On connect callback called prior resolving the connect promise and subscribing to stale resources. May return a promise.
 	 * @param {string} [opt.namespace] Event bus namespace. Defaults to 'resclient'.
 	 * @param {module:modapp~EventBus} [opt.eventBus] Event bus.
 	 */
-	constructor(hostUrl, opt) {
-		this.hostUrl = this._resolvePath(hostUrl);
+	constructor(hostUrlOrFactory, opt) {
+		this.hostUrl = null;
+		if (typeof hostUrlOrFactory == 'function') {
+			this.wsFactory = hostUrlOrFactory;
+		} else {
+			this.hostUrl = this._resolvePath(hostUrlOrFactory);
+			this.wsFactory = () => new WebSocket(this.hostUrl);
+		}
 		obj.update(this, opt, {
 			onConnect: { type: '?function' },
 			namespace: { type: 'string', default: defaultNamespace },
@@ -170,7 +181,7 @@ class ResClient {
 
 		return this.connectPromise = this.connectPromise || new Promise((resolve, reject) => {
 			this.connectCallback = { resolve, reject };
-			this.ws = new WebSocket(this.hostUrl);
+			this.ws = this.wsFactory();
 
 			this.ws.onopen = this._handleOnopen;
 			this.ws.onerror = this._handleOnerror;
@@ -231,10 +242,11 @@ class ResClient {
 	}
 
 	/**
-	 * Resource factory callback
-	 * @callback resourceFactoryCallback
+	 * Model factory callback
+	 * @callback ResClient~modelFactory
 	 * @param {ResClient} api ResClient instance
 	 * @param {string} rid Resource ID
+	 * @returns {ResModel} Model instance object.
 	 */
 
 	/**
@@ -243,7 +255,7 @@ class ResClient {
 	 * * The asterisk (*) matches any part at any level of the resource name.
 	 * * The greater than symbol (>) matches one or more parts at the end of a resource name, and must be the last part.
 	 * @param {string} pattern Pattern of the model type.
-	 * @param {resourceFactoryCallback} factory Model factory callback
+	 * @param {ResClient~modelFactory} factory Model factory callback
 	 */
 	registerModelType(pattern, factory) {
 		this.types.model.list.addFactory(pattern, factory);
@@ -252,11 +264,19 @@ class ResClient {
 	/**
 	 * Unregister a previously registered model type pattern.
 	 * @param {string} pattern Pattern of the model type.
-	 * @returns {resourceFactoryCallback} Unregistered model factory callback
+	 * @returns {ResClient~modelFactory} Unregistered model factory callback
 	 */
 	unregisterModelType(pattern) {
 		return this.types.model.list.removeFactory(pattern);
 	}
+
+	/**
+	 * Collection factory callback
+	 * @callback ResClient~collectionFactory
+	 * @param {ResClient} api ResClient instance
+	 * @param {string} rid Resource ID
+	 * @returns {ResCollection} Collection instance object.
+	 */
 
 	/**
 	 * Register a collection type.
@@ -264,7 +284,7 @@ class ResClient {
 	 * * The asterisk (*) matches any part at any level of the resource name.
 	 * * The greater than symbol (>) matches one or more parts at the end of a resource name, and must be the last part.
 	 * @param {string} pattern Pattern of the collection type.
-	 * @param {ResClient~resourceFactoryCallback} factory Collection factory callback
+	 * @param {ResClient~collectionFactory} factory Collection factory callback
 	 */
 	registerCollectionType(pattern, factory) {
 		this.types.collection.list.addFactory(pattern, factory);
@@ -273,7 +293,7 @@ class ResClient {
 	/**
 	 * Unregister a previously registered collection type pattern.
 	 * @param {string} pattern Pattern of the collection type.
-	 * @returns {resourceFactoryCallback} Unregistered collection factory callback
+	 * @returns {ResClient~collectionFactory} Unregistered collection factory callback
 	 */
 	unregisterCollectionType(pattern) {
 		return this.types.model.list.removeFactory(pattern);
@@ -323,7 +343,8 @@ class ResClient {
 	}
  
 	/**
-	 * Creates a new resource by calling the 'new' method.
+	 * Creates a new resource by calling the 'new' method.  
+	 * Use call with 'new' as method parameter instead.
 	 * @param {*} rid Resource ID
 	 * @param {*} params Method parameters
 	 * @return {Promise.<(ResModel|ResCollection)>} Promise of the resource.
