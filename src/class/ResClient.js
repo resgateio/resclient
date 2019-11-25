@@ -17,6 +17,16 @@ const errorFactory = function(api, rid) {
 	return new ResError(rid);
 };
 
+const versionToInt = function(version) {
+	if (!version) return 0;
+	let p = version.split('.');
+	let v = 0;
+	for (let i = 0; i < 3; i++) {
+		v = v * 1000 + Number(p[i]);
+	}
+	return v;
+};
+
 // Resource types
 const typeCollection = 'collection';
 const typeModel = 'model';
@@ -33,6 +43,9 @@ const stateNone = 0;
 const stateDelete = 1;
 const stateKeep = 2;
 const stateStale = 3;
+// RES Protocol version
+const legacyProtocol = versionToInt("1.1.1");
+const supportedProtocol = "1.2.0";
 
 /**
  * Connect event emitted on connect.
@@ -137,6 +150,14 @@ class ResClient {
 		this._handleOnmessage = this._handleOnmessage.bind(this);
 		this._handleOnclose = this._handleOnclose.bind(this);
 		this._unsubscribe = this._unsubscribe.bind(this);
+	}
+
+	/**
+	 * RES protocol level supported by this client version.
+	 * @returns {string} Supported RES protocol version.
+	 */
+	get supportedProtocol() {
+		return supportedProtocol;
 	}
 
 	/**
@@ -287,7 +308,7 @@ class ResClient {
 	 * @returns {Promise.<object>} Promise of the call result.
 	 */
 	call(rid, method, params) {
-		return this._send('call', rid, method || '', params);
+		return this._call('call', rid, method, params);
 	}
 
 	/**
@@ -298,20 +319,21 @@ class ResClient {
 	 * @returns {Promise.<object>} Promise of the authentication result.
 	 */
 	authenticate(rid, method, params) {
-		return this._send('auth', rid, method || '', params);
+		return this._call('auth', rid, method, params);
 	}
-
+ 
 	/**
 	 * Creates a new resource by calling the 'new' method.
 	 * @param {*} rid Resource ID
 	 * @param {*} params Method parameters
 	 * @return {Promise.<(ResModel|ResCollection)>} Promise of the resource.
+	 * @deprecated since version 2.1.0. Use call with 'new' as method parameter instead.
 	 */
 	create(rid, params) {
 		return this._send('new', rid, null, params)
-			.then(response => {
-				this._cacheResources(response);
-				let ci = this.cache[response.rid];
+			.then(result => {
+				this._cacheResources(result);
+				let ci = this.cache[result.rid];
 				ci.setSubscribed(true);
 				return ci.item;
 			});
@@ -427,6 +449,23 @@ class ResClient {
 		} else {
 			throw new Error("Invalid message from server: " + json);
 		}
+	}
+
+	_call(type, rid, method, params) {
+		return this._send(type, rid, method || '', params)
+			.then(result => {
+				// Legacy v1.1.1 behavior
+				if (this.protocol <= legacyProtocol) {
+					return result;
+				}
+				if (result.rid) {
+					this._cacheResources(result);
+					let ci = this.cache[result.rid];
+					ci.setSubscribed(true);
+					return ci.item;
+				}
+				return result.payload;
+			});
 	}
 
 	_handleErrorResponse(req, data) {
@@ -674,7 +713,20 @@ class ResClient {
 	_handleOnopen(e) {
 		this.connected = true;
 
-		Promise.resolve(this.onConnect ? this.onConnect() : null)
+		this._sendNow('version', { protocol: this.supportedProtocol })
+			.then(ver => {
+				this.protocol = versionToInt(ver.protocol) || legacyProtocol;
+			})
+			.catch(err => {
+				// Invalid error means the gateway doesn't support
+				// version requests. Default to legacy protocol.
+				if (err.code && err.code == 'system.invalidRequest') {
+					this.protocol = legacyProtocol;
+					return;
+				}
+				throw err;
+			})
+			.then(() => this.onConnect ? this.onConnect() : null)
 			.then(() => {
 				this._subscribeToAllStale();
 				this._emit('connect', e);

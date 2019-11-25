@@ -93,6 +93,16 @@ class ResModel {
 	}
 
 	/**
+	 * Calls an auth method on the model.
+	 * @param {string} method Auth method name
+	 * @param {*} params Method parameters
+	 * @returns {Promise.<object>} Promise of the auth result.
+	 */
+	auth(method, params) {
+		return this._api.authenticate(this._rid, method, params);
+	}
+
+	/**
 	 * Initializes the model with a data object.
 	 * Should only be called by the ResClient instance.
 	 * @param {object} data Data object
