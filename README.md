@@ -63,6 +63,17 @@ client.get('example.mymodel').then(model => {
 >
 > All examples are complete with both service and client.
 
+## Usage in Node.js
+
+To connect with *WebSockets* in Node.js, we must use a library implementing the [WebSocket API](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket), such as [isomorphic-ws](https://www.npmjs.com/package/isomorphic-ws).
+
+```javascript
+var WebSocket = require('isomorphic-ws');
+var ResClient = require('resclient').default;
+// Create instance with a WebSocket factory function
+var client = new ResClient(() => new WebSocket("ws://localhost:8080"));
+```
+
 ## Documentation
 
 [Markdown documentation](docs/docs.md)
