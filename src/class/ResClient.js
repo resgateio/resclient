@@ -347,7 +347,7 @@ class ResClient {
 	}
 
 	/**
-	 * Creates a new resource by calling the 'new' method.
+	 * Creates a new resource by calling the 'new' method.  
 	 * Use call with 'new' as method parameter instead.
 	 * @param {*} rid Resource ID
 	 * @param {*} params Method parameters
