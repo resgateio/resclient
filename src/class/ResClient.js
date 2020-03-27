@@ -309,7 +309,11 @@ class ResClient {
 		// Check for resource in cache
 		let ci = this.cache[rid];
 		if (ci) {
-			return ci.promise ? ci.promise : Promise.resolve(ci.item);
+			if (ci.promise) {
+				return ci.promise;
+			}
+			ci.resetTimeout();
+			return Promise.resolve(ci.item);
 		}
 
 		ci = new CacheItem(rid, this._unsubscribe);
@@ -341,9 +345,9 @@ class ResClient {
 	authenticate(rid, method, params) {
 		return this._call('auth', rid, method, params);
 	}
- 
+
 	/**
-	 * Creates a new resource by calling the 'new' method.  
+	 * Creates a new resource by calling the 'new' method.
 	 * Use call with 'new' as method parameter instead.
 	 * @param {*} rid Resource ID
 	 * @param {*} params Method parameters
@@ -381,7 +385,7 @@ class ResClient {
 	resourceOn(rid, events, handler) {
 		let cacheItem = this.cache[rid];
 		if (!cacheItem) {
-			throw new Error("Resource not found in cache");
+			throw new Error("Resource " + rid + " not found in cache");
 		}
 
 		cacheItem.addDirect();
@@ -391,7 +395,7 @@ class ResClient {
 	resourceOff(rid, events, handler) {
 		let cacheItem = this.cache[rid];
 		if (!cacheItem) {
-			throw new Error("Resource not found in cache");
+			throw new Error("Resource " + rid + " not found in cache");
 		}
 
 		cacheItem.removeDirect();
