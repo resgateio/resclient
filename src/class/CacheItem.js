@@ -69,6 +69,14 @@ class CacheItem {
 		}
 	}
 
+	resetTimeout() {
+		if (this.unsubTimeout) {
+			clearTimeout(this.unsubTimeout);
+			this.unsubTimeout = null;
+			this._checkUnsubscribe();
+		}
+	}
+
 	_checkUnsubscribe() {
 		if (!this.subscribed || this.direct || this.unsubTimeout) {
 			return;
