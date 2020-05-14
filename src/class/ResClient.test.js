@@ -324,6 +324,46 @@ describe("ResClient", () => {
 				}));
 			});
 		});
+
+		it("unsubscribes model with multiple direct subscriptions, when no longer listened to", () => {
+			return getServerResource('service.model', modelResources).then(model => {
+				let promise = model.call('test');
+
+				return flushRequests().then(() => {
+					let req = server.getNextRequest();
+					server.sendResponse(req, { rid: "service.model" });
+
+					return flushRequests()
+						.then(() => promise)
+						.then(m => {
+							expect(m).toBe(model);
+							// Cause unsubscribe by waiting
+							return waitAWhile().then(flushRequests).then(() => {
+								expect(server.error).toBe(null);
+								// Expect 2 unsubscribes
+								for (var i = 0; i < 2; i++) {
+									let req = server.getNextRequest();
+									expect(req).not.toBe(undefined);
+									expect(req.method).toBe('unsubscribe.service.model');
+									server.sendResponse(req, null);
+								}
+
+								// Wait for the unsubscribe response
+								return flushRequests().then(() => {
+									expect(server.error).toBe(null);
+
+									return getServerResource('service.model', modelResources).then(modelSecond => {
+										expect(model).not.toBe(modelSecond);
+
+										let req = server.getNextRequest();
+										expect(req).toBe(undefined);
+									});
+								});
+							});
+						});
+				});
+			});
+		});
 	});
 
 	describe("getResource collection", () => {
@@ -736,6 +776,8 @@ describe("ResClient", () => {
 		it("instantly resubscribes to a model when listening between an unsubscribe request and its response", () => {
 			// TODO
 		});
+
+
 	});
 
 	describe("collection.on", () => {
