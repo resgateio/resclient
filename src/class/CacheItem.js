@@ -15,17 +15,20 @@ class CacheItem {
 		this.item = null;
 		this.direct = 0;
 		this.indirect = 0;
-		this.subscribed = false;
+		this.subscribed = 0; // Count of direct subscriptions towards Resgate
 		this.promise = null;
 	}
 
-	setSubscribed(isSubscribed) {
-		this.subscribed = isSubscribed;
-		if (!isSubscribed && this.unsubTimeout) {
+	/**
+	 * Adds or subtracts from the subscribed counter.
+	 * @param {number} dir Value to add. If 0, the subscribed counter will be set to 0.
+	 */
+	addSubscribed(dir) {
+		this.subscribed += dir ? dir : -this.subscribed;
+		if (!this.subscribed && this.unsubTimeout) {
 			clearTimeout(this.unsubTimeout);
 			this.unsubTimeout = null;
 		}
-		return this;
 	}
 
 	setPromise(promise) {

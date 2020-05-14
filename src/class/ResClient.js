@@ -366,7 +366,7 @@ class ResClient {
 			.then(result => {
 				this._cacheResources(result);
 				let ci = this.cache[result.rid];
-				ci.setSubscribed(true);
+				ci.addSubscribed(1);
 				return ci.item;
 			});
 	}
@@ -493,7 +493,7 @@ class ResClient {
 				if (result.rid) {
 					this._cacheResources(result);
 					let ci = this.cache[result.rid];
-					ci.setSubscribed(true);
+					ci.addSubscribed(1);
 					return ci.item;
 				}
 				return result.payload;
@@ -675,7 +675,7 @@ class ResClient {
 	}
 
 	_handleUnsubscribeEvent(cacheItem) {
-		cacheItem.setSubscribed(false);
+		cacheItem.addSubscribed(0);
 		this._tryDelete(cacheItem);
 		this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + cacheItem.rid + '.unsubscribe', { item: cacheItem.item });
 		return true;
@@ -707,7 +707,7 @@ class ResClient {
 
 	_subscribe(ci, throwError) {
 		let rid = ci.rid;
-		ci.setSubscribed(true);
+		ci.addSubscribed(1);
 		this._removeStale(rid);
 		return this._send('subscribe', rid)
 			.then(response => this._cacheResources(response))
@@ -806,7 +806,7 @@ class ResClient {
 			for (let rid in this.cache) {
 				let ci = this.cache[rid];
 				if (ci.subscribed) {
-					ci.setSubscribed(false);
+					ci.addSubscribed(0);
 					this._addStale(rid);
 					this._tryDelete(ci);
 				}
@@ -1225,18 +1225,22 @@ class ResClient {
 
 		this._subscribeReferred(ci);
 
-		this._send('unsubscribe', ci.rid)
-			.then(() => {
-				ci.setSubscribed(false);
-				this._tryDelete(ci);
-			})
-			.catch(err => this._tryDelete(ci));
+		let i = ci.subscribed;
+		while (i--) {
+			this._send('unsubscribe', ci.rid)
+				.then(() => {
+					ci.addSubscribed(-1);
+					this._tryDelete(ci);
+				})
+				.catch(err => this._tryDelete(ci));
+		}
 	}
 
 	_subscribeReferred(ci) {
-		ci.subscribed = false;
+		let i = ci.subscribed;
+		ci.subscribed = 0;
 		let refs = this._getRefState(ci);
-		ci.subscribed = true;
+		ci.subscribed = i;
 
 		for (let rid in refs) {
 			let r = refs[rid];
@@ -1247,7 +1251,7 @@ class ResClient {
 	}
 
 	_handleFailedSubscribe(cacheItem) {
-		cacheItem.setSubscribed(false);
+		cacheItem.addSubscribed(-1);
 		this._tryDelete(cacheItem);
 	}
 
