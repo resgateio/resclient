@@ -54,6 +54,7 @@ ResClient represents a client connection to a RES API.
         * [~disconnectCallback](#ResClient..disconnectCallback) : <code>function</code>
         * [~errorCallback](#ResClient..errorCallback) : <code>function</code>
         * [~websocketFactory](#ResClient..websocketFactory) ⇒ <code>WebSocket</code>
+        * [~onConnectCallback](#ResClient..onConnectCallback) ⇒ <code>Promise</code>
         * [~modelFactory](#ResClient..modelFactory) ⇒ [<code>ResModel</code>](#ResModel)
         * [~collectionFactory](#ResClient..collectionFactory) ⇒ [<code>ResCollection</code>](#ResCollection)
 
@@ -135,7 +136,7 @@ Sets the onConnect callback.
 
 | Param | Type | Description |
 | --- | --- | --- |
-| onConnect | <code>function</code> | On connect callback called prior resolving the connect promise and subscribing to stale resources. May return a promise. |
+| onConnect | [<code>onConnectCallback</code>](#ResClient..onConnectCallback) | On connect callback called prior resolving the connect promise and subscribing to stale resources. May return a promise. |
 
 <a name="ResClient+registerModelType"></a>
 
@@ -301,6 +302,18 @@ WebSocket factory function.
 
 **Kind**: inner typedef of [<code>ResClient</code>](#ResClient)  
 **Returns**: <code>WebSocket</code> - WebSocket instance implementing the [WebSocket API](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket).  
+<a name="ResClient..onConnectCallback"></a>
+
+### ResClient~onConnectCallback ⇒ <code>Promise</code>
+OnConnect callback function.
+
+**Kind**: inner typedef of [<code>ResClient</code>](#ResClient)  
+**Returns**: <code>Promise</code> - Promise for the onConnect handlers completion. Must always resolve.  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| ResClient | [<code>ResClient</code>](#ResClient) | instance |
+
 <a name="ResClient..modelFactory"></a>
 
 ### ResClient~modelFactory ⇒ [<code>ResModel</code>](#ResModel)
