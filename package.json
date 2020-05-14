@@ -1,7 +1,7 @@
 {
   "name": "resclient",
-  "version": "2.1.1",
-  "description": "Client implementation of the RES-Client Protocol.",
+  "version": "2.1.2",
+  "description": "Resgate client implementing the RES-Client Protocol.",
   "main": "lib/index.js",
   "module": "es/index.js",
   "jsnext:main": "es/index.js",
