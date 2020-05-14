@@ -72,6 +72,13 @@ const supportedProtocol = "1.2.0";
  */
 
 /**
+ * OnConnect callback function.
+ * @callback ResClient~onConnectCallback
+ * @param {ResClient} ResClient instance
+ * @returns {?Promise} Promise for the onConnect handlers completion. Must always resolve.
+ */
+
+/**
  * ResClient represents a client connection to a RES API.
  */
 class ResClient {
@@ -233,7 +240,7 @@ class ResClient {
 
 	/**
 	 * Sets the onConnect callback.
-	 * @param {?function} onConnect On connect callback called prior resolving the connect promise and subscribing to stale resources. May return a promise.
+	 * @param {?ResClient~onConnectCallback} onConnect On connect callback called prior resolving the connect promise and subscribing to stale resources. May return a promise.
 	 * @returns {this}
 	 */
 	setOnConnect(onConnect) {
@@ -557,7 +564,7 @@ class ResClient {
 			break;
 
 		case 'unsubscribe':
-			handled = this._handleUnsubscribeEvent(cacheItem, event);
+			handled = this._handleUnsubscribeEvent(cacheItem);
 			break;
 		}
 
@@ -667,10 +674,10 @@ class ResClient {
 		return true;
 	}
 
-	_handleUnsubscribeEvent(cacheItem, event) {
+	_handleUnsubscribeEvent(cacheItem) {
 		cacheItem.setSubscribed(false);
 		this._tryDelete(cacheItem);
-		this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + cacheItem.rid + '.' + event, { item: cacheItem.item });
+		this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + cacheItem.rid + '.unsubscribe', { item: cacheItem.item });
 		return true;
 	}
 
@@ -705,9 +712,11 @@ class ResClient {
 		return this._send('subscribe', rid)
 			.then(response => this._cacheResources(response))
 			.catch(err => {
-				this._handleFailedSubscribe(ci);
 				if (throwError) {
+					this._handleFailedSubscribe(ci);
 					throw err;
+				} else {
+					this._handleUnsubscribeEvent(ci);
 				}
 			});
 	}
@@ -751,7 +760,7 @@ class ResClient {
 				}
 				throw err;
 			})
-			.then(() => this.onConnect ? this.onConnect() : null)
+			.then(() => this.onConnect ? this.onConnect(this) : null)
 			.then(() => {
 				this._subscribeToAllStale();
 				this._emit('connect', e);
@@ -1237,7 +1246,7 @@ class ResClient {
 		}
 	}
 
-	_handleFailedSubscribe(cacheItem, err) {
+	_handleFailedSubscribe(cacheItem) {
 		cacheItem.setSubscribed(false);
 		this._tryDelete(cacheItem);
 	}
