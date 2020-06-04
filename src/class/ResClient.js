@@ -606,7 +606,7 @@ class ResClient {
 				} else if (v.rid) {
 					vals[k] = v.soft
 						? new ResRef(this, v.rid)
-						: this.cache[v.rid].ci.item;
+						: this.cache[v.rid].item;
 				} else {
 					throw new Error("Unsupported model change value: ", v);
 				}
@@ -624,7 +624,7 @@ class ResClient {
 		let ind = {};
 		for (let k in changed) {
 			if ((rid = getRID(changed[k]))) {
-				ind[rid] = (ind[rid] || 0) + 1;
+				ind[rid] = (ind[rid] || 0) - 1;
 			}
 			if ((rid = getRID(vals[k]))) {
 				ind[rid] = (ind[rid] || 0) + 1;
@@ -635,7 +635,7 @@ class ResClient {
 		// model
 		for (rid in ind) {
 			let d = ind[rid];
-			ci = this.cache[rid];
+			let ci = this.cache[rid];
 			ci.addIndirect(d);
 			if (d < 0) {
 				this._tryDelete(ci);
