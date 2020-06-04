@@ -90,10 +90,6 @@ class CacheItem {
 
 	addIndirect(n = 1) {
 		this.indirect += n;
-	}
-
-	removeIndirect(n = 1) {
-		this.indirect -= n;
 		if (this.indirect < 0) {
 			throw "Indirect count reached below 0";
 		}
