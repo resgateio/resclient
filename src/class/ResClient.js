@@ -6,6 +6,8 @@ import TypeList from './TypeList';
 import ResCollection from './ResCollection';
 import ResModel from './ResModel';
 import ResError from './ResError';
+import ResRef from './ResRef';
+import equal from './equal';
 
 const defaultModelFactory = function(api, rid) {
 	return new ResModel(api, rid);
@@ -25,6 +27,10 @@ const versionToInt = function(version) {
 		v = v * 1000 + Number(p[i]);
 	}
 	return v;
+};
+
+const getRID = function(v) {
+	return v !== null && typeof v === 'object' && typeof v.getResourceId === 'function' ? v.getResourceId() : null;
 };
 
 // Resource types
@@ -129,9 +135,13 @@ class ResClient {
 						v = o[k];
 						// Is the value a reference, get the actual item from cache
 						if (typeof v === 'object' && v !== null && v.rid) {
-							let ci = this.cache[v.rid];
-							ci.addIndirect();
-							o[k] = ci.item;
+							if (v.soft) {
+								o[k] = new ResRef(this, v.rid);
+							} else {
+								let ci = this.cache[v.rid];
+								ci.addIndirect();
+								o[k] = ci.item;
+							}
 						}
 					}
 					return o;
@@ -145,9 +155,13 @@ class ResClient {
 				prepareData: dta => dta.map(v => {
 					// Is the value a reference, get the actual item from cache
 					if (typeof v === 'object' && v !== null && v.rid) {
-						let ci = this.cache[v.rid];
-						ci.addIndirect();
-						return ci.item;
+						if (v.soft) {
+							return new ResRef(this, v.rid);
+						} else {
+							let ci = this.cache[v.rid];
+							ci.addIndirect();
+							return ci.item;
+						}
 					}
 					return v;
 				}),
@@ -552,7 +566,7 @@ class ResClient {
 		let handled = false;
 		switch (event) {
 		case 'change':
-			handled = this._handleChangeEvent(cacheItem, event, data.data);
+			handled = this._handleChangeEvent(cacheItem, event, data.data, false);
 			break;
 
 		case 'add':
@@ -573,7 +587,7 @@ class ResClient {
 		}
 	}
 
-	_handleChangeEvent(cacheItem, event, data) {
+	_handleChangeEvent(cacheItem, event, data, reset) {
 		if (cacheItem.type !== typeModel) {
 			return false;
 		}
@@ -582,8 +596,7 @@ class ResClient {
 
 		// Set deleted properties to undefined
 		let item = cacheItem.item;
-		let rm = {};
-		let v, ov, ci, r;
+		let v, rid;
 		let vals = data.values;
 		for (let k in vals) {
 			v = vals[k];
@@ -591,45 +604,45 @@ class ResClient {
 				if (v.action === 'delete') {
 					vals[k] = undefined;
 				} else if (v.rid) {
-					ci = this.cache[v.rid];
-					vals[k] = ci.item;
-					if (rm.hasOwnProperty(v.rid)) {
-						rm[v.rid]--;
-					} else {
-						rm[v.rid] = -1;
-					}
+					vals[k] = v.soft
+						? new ResRef(this, v.rid)
+						: this.cache[v.rid].item;
 				} else {
 					throw new Error("Unsupported model change value: ", v);
 				}
 			}
+		}
 
-			ov = item[k];
-			if (this._isResource(ov)) {
-				let rid = ov.getResourceId();
-				if (rm.hasOwnProperty(rid)) {
-					rm[rid]++;
-				} else {
-					rm[rid] = 1;
-				}
+		// Update the model with new values
+		let changed = item.__update(vals, reset);
+		if (!changed) {
+			return false;
+		}
+
+		// Used changed object to determine which resource references has been
+		// added or removed.
+		let ind = {};
+		for (let k in changed) {
+			if ((rid = getRID(changed[k]))) {
+				ind[rid] = (ind[rid] || 0) - 1;
+			}
+			if ((rid = getRID(vals[k]))) {
+				ind[rid] = (ind[rid] || 0) + 1;
 			}
 		}
 
-		// Remove indirect reference to resources no longer referenced in the model
-		for (let rid in rm) {
-			r = rm[rid];
-			ci = this.cache[rid];
-			ci.removeIndirect(r);
-			if (r > 0) {
+		// Remove indirect reference to resources no longer referenced in the
+		// model
+		for (rid in ind) {
+			let d = ind[rid];
+			let ci = this.cache[rid];
+			ci.addIndirect(d);
+			if (d < 0) {
 				this._tryDelete(ci);
 			}
 		}
 
-		// Update the model with new values
-		let changed = cacheItem.item.__update(vals);
-		if (changed) {
-			this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + cacheItem.rid + '.' + event, changed);
-		}
-
+		this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + cacheItem.rid + '.' + event, changed);
 		return true;
 	}
 
@@ -643,10 +656,14 @@ class ResClient {
 
 		// Get resource if value is a resource reference
 		if (v !== null && typeof v === 'object' && v.rid) {
-			this._cacheResources(data);
-			let ci = this.cache[v.rid];
-			ci.addIndirect();
-			v = ci.item;
+			if (v.soft) {
+				v = new ResRef(this, v.rid);
+			} else {
+				this._cacheResources(data);
+				let ci = this.cache[v.rid];
+				ci.addIndirect();
+				v = ci.item;
+			}
 		}
 		cacheItem.item.__add(v, idx);
 		this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + cacheItem.rid + '.' + event, { item: v, idx });
@@ -662,13 +679,14 @@ class ResClient {
 		let item = cacheItem.item.__remove(idx);
 		this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + cacheItem.rid + '.' + event, { item, idx });
 
-		if (this._isResource(item)) {
-			let refItem = this.cache[item.getResourceId()];
+		let rid = getRID(item);
+		if (rid) {
+			let refItem = this.cache[rid];
 			if (!refItem) {
 				throw new Error("Removed model is not in cache");
 			}
 
-			refItem.removeIndirect();
+			refItem.addIndirect(-1);
 			this._tryDelete(refItem);
 		}
 		return true;
@@ -993,7 +1011,7 @@ class ResClient {
 			for (let v of item) {
 				ri = this._getRefItem(v);
 				if (ri) {
-					ri.removeIndirect();
+					ri.addIndirect(-1);
 				}
 			}
 			break;
@@ -1002,7 +1020,7 @@ class ResClient {
 				if (item.hasOwnProperty(k)) {
 					ri = this._getRefItem(item[k]);
 					if (ri) {
-						ri.removeIndirect();
+						ri.addIndirect(-1);
 					}
 				}
 			}
@@ -1012,15 +1030,11 @@ class ResClient {
 		this._removeStale(ci.rid);
 	}
 
-	_isResource(v) {
-		return v !== null && typeof v === 'object' && typeof v.getResourceId === 'function';
-	}
-
 	_getRefItem(v) {
-		if (!this._isResource(v)) {
+		let rid = getRID(v);
+		if (!rid) {
 			return null;
 		}
-		let rid = v.getResourceId();
 		let refItem = this.cache[rid];
 		// refItem not in cache means
 		// item has been deleted as part of
@@ -1101,7 +1115,7 @@ class ResClient {
 	}
 
 	_syncModel(cacheItem, data) {
-		this._handleChangeEvent(cacheItem, 'change', { values: data });
+		this._handleChangeEvent(cacheItem, 'change', { values: data }, true);
 	}
 
 	_syncCollection(cacheItem, data) {
@@ -1114,8 +1128,7 @@ class ResClient {
 
 		let b = data.map(v => (
 			v != null && typeof v === 'object' && v.rid
-				// Is the value a reference, get the actual item from cache
-				? this.cache[v.rid].item
+				? (v.soft ? new ResRef(this, v.rid) : this.cache[v.rid].item)
 				: v
 		));;
 		this._patchDiff(a, b,
@@ -1134,13 +1147,13 @@ class ResClient {
 		let t, i, j, s = 0, aa, bb, m = a.length, n = b.length;
 
 		// Trim of matches at the start and end
-		while (s < m && s < n && a[s] === b[s]) {
+		while (s < m && s < n && equal(a[s], b[s])) {
 			s++;
 		}
 		if (s === m && s === n) {
 			return;
 		}
-		while (s < m && s < n && a[m - 1] === b[n - 1]) {
+		while (s < m && s < n && equal(a[m - 1], b[n - 1])) {
 			m--;
 			n--;
 		}
@@ -1171,7 +1184,7 @@ class ResClient {
 
 		for (i = 0; i < m; i++) {
 			for (j = 0; j < n; j++) {
-				c[i + 1][j + 1] = aa[i] === bb[j]
+				c[i + 1][j + 1] = equal(aa[i], bb[j])
 					? c[i][j] + 1
 					: Math.max(c[i + 1][j], c[i][j + 1]);
 			}
@@ -1188,7 +1201,7 @@ class ResClient {
 		while (true) {
 			m = i - 1;
 			n = j - 1;
-			if (i > 0 && j > 0 && aa[m] === bb[n]) {
+			if (i > 0 && j > 0 && equal(aa[m], bb[n])) {
 				onKeep(aa[m], m + s, n + s, --idx);
 				i--;
 				j--;

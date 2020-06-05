@@ -1,4 +1,5 @@
 import { obj } from 'modapp-utils';
+import equal from './equal';
 
 /**
  * Change event emitted on any change to one or more public (non-underscore) properties.
@@ -125,10 +126,11 @@ class ResModel {
 	 * Updates the model.
 	 * Should only be called by the ResClient instance.
 	 * @param {object} props Properties to update
+	 * @param {boolean} reset Flag that sets if missing values should be deleted.
 	 * @returns {?object} Changed properties
 	 * @private
 	 */
-	__update(props) {
+	__update(props, reset) {
 		if (!props) {
 			return null;
 		}
@@ -136,6 +138,16 @@ class ResModel {
 		let changed = null;
 		let v, promote;
 		let p = this._props;
+
+		if (reset) {
+			props = Object.assign({}, props);
+			for (var k in p) {
+				if (!props.hasOwnProperty(k)) {
+					props[k] = undefined;
+				}
+			}
+		}
+
 		if (this._definition) {
 			changed = obj.update(p, props, this._definition);
 			for (let key in changed) {
@@ -152,7 +164,7 @@ class ResModel {
 			for (let key in props) {
 				v = props[key];
 				promote = (this.hasOwnProperty(key) || !this[key]) && key[0] !== '_';
-				if (v !== p[key]) {
+				if (!equal(p[key], v)) {
 					changed = changed || {};
 					changed[key] = p[key];
 					if (v === undefined) {

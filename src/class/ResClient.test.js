@@ -2,6 +2,7 @@ import { Server } from 'mock-socket';
 import ResClient from './ResClient.js';
 import ResModel from './ResModel.js';
 import ResCollection from './ResCollection.js';
+import ResRef from './ResRef.js';
 
 class ResServer extends Server {
 	constructor(url) {
@@ -79,9 +80,17 @@ describe("ResClient", () => {
 	let client;
 	let cb;
 	let cb2;
+	let recordedEvents;
+	let eventRecorder = (event) => jest.fn(e => recordedEvents.push(Object.assign(e, { event })));
 	const modelData = {
 		foo: "bar",
-		int: 42
+		int: 42,
+		ref: { rid: 'service.model.soft', soft: true }
+	};
+	const modelDataJson = {
+		foo: "bar",
+		int: 42,
+		ref: { rid: 'service.model.soft' }
 	};
 	const modelResources = {
 		models: {
@@ -109,7 +118,8 @@ describe("ResClient", () => {
 		42,
 		true,
 		false,
-		null
+		null,
+		{ rid: "service.model.soft", soft: true }
 	];
 	const primitiveCollectionResources = {
 		collections: {
@@ -196,6 +206,7 @@ describe("ResClient", () => {
 		client = new ResClient(url);
 		cb = jest.fn();
 		cb2 = jest.fn();
+		recordedEvents = [];
 	});
 
 	afterEach(() => {
@@ -253,6 +264,8 @@ describe("ResClient", () => {
 		it("gets model resource from server", () => {
 			let promise = client.get('service.model').then(model => {
 				expect(model.foo).toBe("bar");
+				expect(model.ref).toBeInstanceOf(ResRef);
+				expect(model.ref.rid).toBe('service.model.soft');
 			});
 
 			return getVersion().then(() => {
@@ -379,6 +392,7 @@ describe("ResClient", () => {
 				expect(collection.atIndex(2)).toBe(true);
 				expect(collection.atIndex(3)).toBe(false);
 				expect(collection.atIndex(4)).toBe(null);
+				expect(collection.atIndex(5)).toMatchObject({ rid: "service.model.soft" });
 			});
 
 			return getVersion().then(() => {
@@ -686,12 +700,15 @@ describe("ResClient", () => {
 			return getServerResource('service.model', modelResources).then(model => {
 				model.on('change', cb);
 
-				server.sendEvent('service.model', 'change', { values: { foo: 'baz' }});
+				server.sendEvent('service.model', 'change', { values: { foo: 'baz', ref: { rid: 'service.collection.soft', soft: true }}});
 				return flushRequests().then(() => {
 					expect(cb.mock.calls.length).toBe(1);
-					expect(cb.mock.calls[0][0]).toEqual({ foo: 'bar' });
+					expect(cb.mock.calls[0][0]).toMatchObject({ foo: 'bar', ref: { rid: 'service.model.soft' }});
+					expect(cb.mock.calls[0][0].ref).toBeInstanceOf(ResRef);
 					expect(cb.mock.calls[0][1]).toBe(model);
 					expect(model.foo).toBe('baz');
+					expect(model.ref).toBeInstanceOf(ResRef);
+					expect(model.ref).toMatchObject({ rid: 'service.collection.soft' });
 
 					let req = server.getNextRequest();
 					expect(req).toBe(undefined);
@@ -986,28 +1003,29 @@ describe("ResClient", () => {
 			return getServerResource('service.primitives', primitiveCollectionResources).then(collection => {
 				collection.on('add', cb);
 
-				server.sendEvent('service.primitives', 'add', { value: "bar", idx: 0 });
+				server.sendEvent('service.primitives', 'add', { value: { rid: "service.collection.soft", soft: true }, idx: 0 });
 				server.sendEvent('service.primitives', 'add', { value: 52, idx: 3 });
-				server.sendEvent('service.primitives', 'add', { value: "end", idx: 7 });
+				server.sendEvent('service.primitives', 'add', { value: "end", idx: 8 });
 
 				return flushRequests().then(() => {
 					expect(cb.mock.calls.length).toBe(3);
-					expect(cb.mock.calls[0][0]).toEqual({ idx: 0, item: "bar" });
+					expect(cb.mock.calls[0][0]).toMatchObject({ idx: 0, item: { rid: "service.collection.soft" }});
 					expect(cb.mock.calls[0][1]).toBe(collection);
 					expect(cb.mock.calls[1][0]).toEqual({ idx: 3, item: 52 });
 					expect(cb.mock.calls[1][1]).toBe(collection);
-					expect(cb.mock.calls[2][0]).toEqual({ idx: 7, item: "end" });
+					expect(cb.mock.calls[2][0]).toEqual({ idx: 8, item: "end" });
 					expect(cb.mock.calls[2][1]).toBe(collection);
 
-					expect(collection.length).toBe(8);
-					expect(collection.atIndex(0)).toBe("bar");
+					expect(collection.length).toBe(9);
+					expect(collection.atIndex(0)).toMatchObject({ rid: "service.collection.soft" });
 					expect(collection.atIndex(1)).toBe("foo");
 					expect(collection.atIndex(2)).toBe(42);
 					expect(collection.atIndex(3)).toBe(52);
 					expect(collection.atIndex(4)).toBe(true);
 					expect(collection.atIndex(5)).toBe(false);
 					expect(collection.atIndex(6)).toBe(null);
-					expect(collection.atIndex(7)).toBe("end");
+					expect(collection.atIndex(7)).toMatchObject({ rid: "service.model.soft" });
+					expect(collection.atIndex(8)).toBe("end");
 
 					let req = server.getNextRequest();
 					expect(req).toBe(undefined);
@@ -1022,19 +1040,23 @@ describe("ResClient", () => {
 				let item0 = collection.atIndex(0);
 				let item1 = collection.atIndex(2);
 				let item2 = collection.atIndex(4);
+				let item3 = collection.atIndex(5);
 
 				server.sendEvent('service.primitives', 'remove', { idx: 0 });
 				server.sendEvent('service.primitives', 'remove', { idx: 1 });
 				server.sendEvent('service.primitives', 'remove', { idx: 2 });
+				server.sendEvent('service.primitives', 'remove', { idx: 2 });
 
 				return flushRequests().then(() => {
-					expect(cb.mock.calls.length).toBe(3);
+					expect(cb.mock.calls.length).toBe(4);
 					expect(cb.mock.calls[0][0]).toEqual({ idx: 0, item: item0 });
 					expect(cb.mock.calls[0][1]).toBe(collection);
 					expect(cb.mock.calls[1][0]).toEqual({ idx: 1, item: item1 });
 					expect(cb.mock.calls[1][1]).toBe(collection);
 					expect(cb.mock.calls[2][0]).toEqual({ idx: 2, item: item2 });
 					expect(cb.mock.calls[2][1]).toBe(collection);
+					expect(cb.mock.calls[3][0]).toEqual({ idx: 2, item: item3 });
+					expect(cb.mock.calls[3][1]).toBe(collection);
 
 					expect(collection.length).toBe(2);
 					expect(collection.atIndex(0)).toBe(42);
@@ -1133,38 +1155,6 @@ describe("ResClient", () => {
 			});
 		});
 
-		it("emits a change event when resubscribed model differs from cached model", () => {
-			return getServerResource('service.model', modelResources).then(model => {
-				model.on('change', cb);
-				let oldUrl = server.url;
-				server.close();
-
-				return flushPromises().then(() => {
-					server = new ResServer(oldUrl);
-
-					return waitAWhile().then(getVersion).then(() => {
-						let req = server.getNextRequest();
-						server.sendResponse(req, { models: {
-							'service.model': {
-								foo: "baz",
-								int: 42
-							}
-						}});
-
-						return flushRequests().then(() => {
-							expect(cb.mock.calls.length).toBe(1);
-							expect(cb.mock.calls[0][0]).toEqual({ foo: 'bar' });
-							expect(cb.mock.calls[0][1]).toBe(model);
-							expect(model.foo).toBe('baz');
-
-							expect(server.error).toBe(null);
-							expect(server.pendingRequests()).toBe(0);
-						});
-					});
-				});
-			});
-		});
-
 		it("emits remove and add events when collection differs from cached collection", () => {
 			return getServerResource('service.collection', collectionResources).then(collection => {
 				let oldUrl = server.url;
@@ -1212,7 +1202,227 @@ describe("ResClient", () => {
 				});
 			});
 		});
+
+		describe("emits a change event when resubscribed model differs from cached model", () => {
+			test.each([
+				[ // No change
+					{ models: { 'service.model': { foo: "bar", int: 42, soft: { rid: 'service.model.soft', soft: true }, ref: { rid: 'service.ref' }}, 'service.ref': { zoo: "baz" }}},
+					{ models: { 'service.model': { foo: "bar", int: 42, soft: { rid: 'service.model.soft', soft: true }, ref: { rid: 'service.ref' }}, 'service.ref': { zoo: "baz" }}},
+					null,
+					model => expect(client.cache['service.ref'].indirect).toBe(1)
+				],
+				[ // Updated values
+					{ models: { 'service.model': { foo: "bar", int: 42, ref: { rid: 'service.model.soft', soft: true }}}},
+					{ models: { 'service.model': { foo: "baz", int: 12, ref: { rid: 'service.collection.soft', soft: true }}}},
+					{ foo: "bar", int: 42, ref: { rid: 'service.model.soft' }},
+					null
+				],
+				[ // New types of values
+					{ models: { 'service.model': { foo: "bar", int: 42, ref: { rid: 'service.model.soft', soft: true }}}},
+					{ models: { 'service.model': { foo: 42, int: { rid: 'service.model.soft', soft: true }, ref: "bar" }}},
+					{ foo: "bar", int: 42, ref: { rid: 'service.model.soft' }},
+					null
+				],
+				[ // Added value
+					{ models: { 'service.model': { foo: "bar", int: 42, ref: { rid: 'service.model.soft', soft: true }}}},
+					{ models: { 'service.model': { foo: "bar", int: 42, ref: { rid: 'service.model.soft', soft: true }, newValue: true }}},
+					{ newValue: undefined },
+					null
+				],
+				[ // Removed values
+					{ models: { 'service.model': { foo: "bar", int: 42, ref: { rid: 'service.model.soft', soft: true }}}},
+					{ models: { 'service.model': {}}},
+					{ foo: "bar", int: 42, ref: { rid: 'service.model.soft' }},
+					null
+				],
+				[ // Decreased reference
+					{ models: { 'service.model': { ref1: { rid: 'service.ref' }, ref2: { rid: 'service.ref' }, ref3: { rid: 'service.ref' }}, 'service.ref': { zoo: "baz" }}},
+					{ models: { 'service.model': { ref1: { rid: 'service.ref' }, ref2: { rid: 'service.ref' }, ref3: null }, 'service.ref': { zoo: "baz" }}},
+					{ ref3: { zoo: "baz" }},
+					model => expect(client.cache['service.ref'].indirect).toBe(2)
+				],
+				[ // Moved reference
+					{ models: { 'service.model': { ref1: { rid: 'service.ref' }, ref2: null }, 'service.ref': { zoo: "baz" }}},
+					{ models: { 'service.model': { ref1: null, ref2: { rid: 'service.ref' }}, 'service.ref': { zoo: "baz" }}},
+					{ ref1: { zoo: "baz" }, ref2: null },
+					model => expect(client.cache['service.ref'].indirect).toBe(1)
+				],
+				[ // Removed reference
+					{ models: { 'service.model': { ref1: { rid: 'service.ref' }}, 'service.ref': { zoo: "baz" }}},
+					{ models: { 'service.model': { ref1: null }}},
+					{ ref1: { zoo: "baz" }},
+					model => expect(typeof client.cache['service.ref']).toBe("undefined")
+				]
+			])("given firstModel=%p, and secondModel=%p gives changed values %p", (firstModel, secondModel, expectedChanged, validate) => {
+				return getServerResource('service.model', firstModel).then(model => {
+					model.on('change', cb);
+					let oldUrl = server.url;
+					server.close();
+
+					// Make shallow copy of old model props
+					let oldProps = Object.assign({}, oldProps);
+
+					return flushPromises().then(() => {
+						server = new ResServer(oldUrl);
+
+						return waitAWhile().then(getVersion).then(() => {
+							let req = server.getNextRequest();
+							server.sendResponse(req, secondModel);
+
+							return flushRequests().then(() => {
+								let changed = {};
+								if (expectedChanged === null) {
+									expect(cb.mock.calls.length).toBe(0);
+								} else {
+									expect(cb.mock.calls.length).toBe(1);
+									expect(cb.mock.calls[0][1]).toBe(model);
+									changed = cb.mock.calls[0][0];
+									expect(JSON.parse(JSON.stringify(changed))).toEqual(expectedChanged);
+								}
+								// Validate old values
+								for (let k in oldProps) {
+									if (changed.hasOwnProperty(k)) {
+										expect(oldProps[k]).toBe(changed[k]);
+										expect(oldProps[k]).not.toBe(model.props[k]);
+									} else {
+										expect(oldProps[k]).toBe(model.props[k]);
+									}
+								}
+								// Validate new values
+								for (let k in model.props) {
+									if (!oldProps.hasOwnProperty) {
+										expect(changed[k]).toBe(model.props[k]);
+									}
+								}
+
+								expect(server.error).toBe(null);
+								expect(server.pendingRequests()).toBe(0);
+								if (validate) {
+									validate(model);
+								}
+							});
+						});
+					});
+				});
+			});
+		});
+
+		describe("emits remove and add events when collection differs from cached collection", () => {
+			test.each([
+				[ // No change
+					{ collections: { 'service.collection': [ "foo", 42, { rid: "service.soft", soft: true }, { rid: 'service.ref' }], 'service.ref': [ "baz" ] }},
+					{ collections: { 'service.collection': [ "foo", 42, { rid: "service.soft", soft: true }, { rid: 'service.ref' }], 'service.ref': [ "baz" ] }},
+					[ "foo", 42, { rid: "service.soft" }, [ "baz" ]],
+					0,
+					collection => expect(client.cache['service.ref'].indirect).toBe(1)
+				],
+				[ // Removed primitive
+					{ collections: { 'service.collection': [ "foo", 42, { rid: "service.ref", soft: true }, { rid: 'service.ref' }], 'service.ref': [ "baz" ] }},
+					{ collections: { 'service.collection': [ "foo", { rid: "service.ref", soft: true }, { rid: 'service.ref' }], 'service.ref': [ "baz" ] }},
+					[ "foo", { rid: "service.ref" }, [ "baz" ]],
+					1,
+					collection => expect(client.cache['service.ref'].indirect).toBe(1)
+				],
+				[ // Removed soft reference
+					{ collections: { 'service.collection': [ "foo", 42, { rid: "service.soft", soft: true }, { rid: 'service.ref' }], 'service.ref': [ "baz" ] }},
+					{ collections: { 'service.collection': [ "foo", 42, { rid: 'service.ref' }], 'service.ref': [ "baz" ] }},
+					[ "foo", 42, [ "baz" ]],
+					1,
+					collection => expect(client.cache['service.ref'].indirect).toBe(1)
+				],
+				[ // Removed reference
+					{ collections: { 'service.collection': [ "foo", 42, { rid: "service.soft", soft: true }, { rid: 'service.ref' }], 'service.ref': [ "baz" ] }},
+					{ collections: { 'service.collection': [ "foo", 42, { rid: "service.soft", soft: true }] }},
+					[ "foo", 42, { rid: "service.soft" }],
+					1,
+					collection => expect(typeof client.cache['service.ref']).toBe("undefined")
+				],
+				[ // Decreased reference
+					{ collections: { 'service.collection': [{ rid: "service.ref" }, { rid: "service.ref" }, { rid: 'service.ref' }], 'service.ref': [ "baz" ] }},
+					{ collections: { 'service.collection': [{ rid: "service.ref" }, { rid: "service.ref" }], 'service.ref': [ "baz" ] }},
+					[[ "baz" ], [ "baz" ]],
+					1,
+					collection => expect(client.cache['service.ref'].indirect).toBe(2)
+				],
+				[ // Added reference
+					{ collections: { 'service.collection': [ "foo" ] }},
+					{ collections: { 'service.collection': [{ rid: "service.ref" }, "foo" ], 'service.ref': [ "baz" ] }},
+					[[ "baz" ], "foo" ],
+					1,
+					collection => expect(client.cache['service.ref'].indirect).toBe(1)
+				],
+				[ // Increased reference
+					{ collections: { 'service.collection': [{ rid: "service.ref" }], 'service.ref': [ "baz" ] }},
+					{ collections: { 'service.collection': [{ rid: "service.ref" }, { rid: "service.ref" }], 'service.ref': [ "baz" ] }},
+					[[ "baz" ], [ "baz" ]],
+					1,
+					collection => expect(client.cache['service.ref'].indirect).toBe(2)
+				],
+				[ // Changed soft reference
+					{ collections: { 'service.collection': [ "foo", { rid: "service.soft", soft: true }] }},
+					{ collections: { 'service.collection': [ "foo", { rid: "service.ref", soft: true }] }},
+					[ "foo", { rid: "service.ref" }],
+					2,
+					null
+				],
+				[ // Changed reference
+					{ collections: { 'service.collection': [ "foo", { rid: 'service.ref1' }], 'service.ref1': [ "zoo" ] }},
+					{ collections: { 'service.collection': [ "foo", { rid: 'service.ref2' }], 'service.ref2': [ "baz" ] }},
+					[ "foo", [ "baz" ]],
+					2,
+					null
+				]
+			])("given firstCollection=%j, and secondCollection=%j gives changed values %j", (firstCollection, secondCollection, expectedCollection, expectedEvents, validate) => {
+				return getServerResource('service.collection', firstCollection).then(collection => {
+					let oldUrl = server.url;
+					// Copy initial collection state
+					let arr = collection.toArray();
+
+					// Record collection events
+					collection.on('add', eventRecorder('add'));
+					collection.on('remove', eventRecorder('remove'));
+
+					server.close();
+
+					return flushPromises().then(() => {
+						server = new ResServer(oldUrl);
+
+						return waitAWhile().then(getVersion).then(() => {
+							let req = server.getNextRequest();
+							server.sendResponse(req, secondCollection);
+
+							return flushRequests().then(() => {
+								expect(JSON.parse(JSON.stringify(collection))).toEqual(expectedCollection);
+								expect(recordedEvents.length).toBe(expectedEvents);
+
+								for (let e of recordedEvents) {
+									switch (e.event) {
+									case 'add':
+										expect(e.idx >= 0 && e.idx <= arr.length).toBe(true);
+										arr.splice(e.idx, 0, e.item);
+										break;
+									case 'remove':
+										expect(e.idx >= 0 && e.idx < arr.length).toBe(true);
+										expect(e.item).toBe(arr[e.idx]);
+										arr.splice(e.idx, 1);
+										break;
+									}
+								}
+
+								expect(JSON.parse(JSON.stringify(arr))).toEqual(expectedCollection);
+								expect(server.error).toBe(null);
+								expect(server.pendingRequests()).toBe(0);
+								if (validate) {
+									validate(collection);
+								}
+							});
+						});
+					});
+				});
+			});
+		});
 	});
+
 
 	describe("setOnConnect", () => {
 
@@ -1516,7 +1726,7 @@ describe("ResClient", () => {
 
 		it("creates anonymous object on toJSON", () => {
 			return getServerResource('service.model', modelResources).then(model => {
-				expect(model.toJSON()).toEqual(modelData);
+				expect(model.toJSON()).toEqual(modelDataJson);
 			});
 		});
 
@@ -1825,6 +2035,32 @@ describe("ResClient", () => {
 			});
 
 		});
+	});
+
+	describe("ResRef", () => {
+
+		describe("get", () => {
+
+			it("gets referenced resource", () => {
+				return getServerResource('service.model', modelResources).then(model => {
+					let promise = model.ref.get().then(refmodel => {
+						expect(refmodel.name).toBe("soft");
+					});
+
+					return flushRequests().then(() => {
+						expect(server.error).toBe(null);
+						let req = server.getNextRequest();
+						expect(req).not.toBe(undefined);
+						expect(req.method).toBe('subscribe.service.model.soft');
+						server.sendResponse(req, { models: { "service.model.soft": { name: "soft" }}});
+						jest.runOnlyPendingTimers();
+						return promise;
+					});
+				});
+			});
+
+		});
+
 	});
 
 });
