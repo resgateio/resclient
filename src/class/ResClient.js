@@ -50,8 +50,9 @@ const stateDelete = 1;
 const stateKeep = 2;
 const stateStale = 3;
 // RES Protocol version
+const supportedProtocol = "1.2.1";
 const legacyProtocol = versionToInt("1.1.1");
-const supportedProtocol = "1.2.0";
+const v1_2_0 = versionToInt("1.2.0");
 
 /**
  * Connect event emitted on connect.
@@ -1239,14 +1240,22 @@ class ResClient {
 		this._subscribeReferred(ci);
 
 		let i = ci.subscribed;
-		while (i--) {
-			this._send('unsubscribe', ci.rid)
-				.then(() => {
-					ci.addSubscribed(-1);
-					this._tryDelete(ci);
-				})
-				.catch(err => this._tryDelete(ci));
+		if (this.protocol <= v1_2_0) {
+			while (i--) {
+				this._sendUnsubscribe(ci, 1);
+			}
+		} else {
+			this._sendUnsubscribe(ci, i);
 		}
+	}
+
+	_sendUnsubscribe(ci, count) {
+		this._send('unsubscribe', ci.rid, null, count > 1 ? { count } : null)
+			.then(() => {
+				ci.addSubscribed(-count);
+				this._tryDelete(ci);
+			})
+			.catch(() => this._tryDelete(ci));
 	}
 
 	_subscribeReferred(ci) {
