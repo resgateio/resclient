@@ -338,8 +338,47 @@ describe("ResClient", () => {
 			});
 		});
 
-		it("unsubscribes model with multiple direct subscriptions, when no longer listened to", () => {
+		it("unsubscribes model with count set to multiple direct subscriptions, when no longer listened to", () => {
 			return getServerResource('service.model', modelResources).then(model => {
+				let promise = model.call('test');
+
+				return flushRequests().then(() => {
+					let req = server.getNextRequest();
+					server.sendResponse(req, { rid: "service.model" });
+
+					return flushRequests()
+						.then(() => promise)
+						.then(m => {
+							expect(m).toBe(model);
+							// Cause unsubscribe by waiting
+							return waitAWhile().then(flushRequests).then(() => {
+								expect(server.error).toBe(null);
+								// Expect single unsubscribe with count set to 2
+								let req = server.getNextRequest();
+								expect(req).not.toBe(undefined);
+								expect(req.method).toBe('unsubscribe.service.model');
+								expect(req.params).toEqual({ count: 2 });
+								server.sendResponse(req, null);
+
+								// Wait for the unsubscribe response
+								return flushRequests().then(() => {
+									expect(server.error).toBe(null);
+
+									return getServerResource('service.model', modelResources).then(modelSecond => {
+										expect(model).not.toBe(modelSecond);
+
+										let req = server.getNextRequest();
+										expect(req).toBe(undefined);
+									});
+								});
+							});
+						});
+				});
+			});
+		});
+
+		it("unsubscribes model using multiple requests matching multiple direct subscriptions, when no longer listened to (protocol <= v1.2.0)", () => {
+			return getServerResource('service.model', modelResources, null, "1.2.0").then(model => {
 				let promise = model.call('test');
 
 				return flushRequests().then(() => {
