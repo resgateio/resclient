@@ -85,12 +85,14 @@ describe("ResClient", () => {
 	const modelData = {
 		foo: "bar",
 		int: 42,
-		ref: { rid: 'service.model.soft', soft: true }
+		ref: { rid: 'service.model.soft', soft: true },
+		dta: { data: { foo: [ "bar" ] }}
 	};
 	const modelDataJson = {
 		foo: "bar",
 		int: 42,
-		ref: { rid: 'service.model.soft' }
+		ref: { rid: 'service.model.soft' },
+		dta: { foo: [ "bar" ] }
 	};
 	const modelResources = {
 		models: {
@@ -266,6 +268,7 @@ describe("ResClient", () => {
 				expect(model.foo).toBe("bar");
 				expect(model.ref).toBeInstanceOf(ResRef);
 				expect(model.ref.rid).toBe('service.model.soft');
+				expect(model.dta.foo[0]).toBe("bar");
 			});
 
 			return getVersion().then(() => {
@@ -285,6 +288,7 @@ describe("ResClient", () => {
 		it("gets model resource from cache on second request", () => {
 			return getServerResource('service.model', modelResources).then(model => {
 				expect(model.foo).toBe("bar");
+				expect(model.dta.foo[0]).toBe("bar");
 				return client.get('service.model').then(modelSecond => {
 					expect(model).toBe(modelSecond);
 
@@ -1291,7 +1295,58 @@ describe("ResClient", () => {
 					{ models: { 'service.model': { ref1: null }}},
 					{ ref1: { zoo: "baz" }},
 					model => expect(typeof client.cache['service.ref']).toBe("undefined")
-				]
+				],
+				[ // No change in data value
+					{ models: { 'service.model': { obj: { data: { foo: [ "bar", "baz" ] }}, arr: { data: [{ foo: "bar", zoo: "baz" }] }}}},
+					{ models: { 'service.model': { obj: { data: { foo: [ "bar", "baz" ] }}, arr: { data: [{ foo: "bar", zoo: "baz" }] }}}},
+					null,
+					model => expect(model.obj.foo[1]).toBe("baz")
+				],
+				[ // Changed order in data value array
+					{ models: { 'service.model': { arr: { data: [ "bar", "baz" ] }}}},
+					{ models: { 'service.model': { arr: { data: [ "baz", "bar" ] }}}},
+					{ arr: [ "bar", "baz" ] },
+					model => expect(model.arr[1]).toBe("bar")
+				],
+				[ // Changed count in data value array
+					{ models: { 'service.model': { arr: { data: [ "bar", "baz" ] }}}},
+					{ models: { 'service.model': { arr: { data: [ "bar" ] }}}},
+					{ arr: [ "bar", "baz" ] },
+					model => expect(model.arr.length).toBe(1)
+				],
+				[ // Changed order in data value object
+					{ models: { 'service.model': { obj: { data: { foo: "bar", zoo: "baz" }}}}},
+					{ models: { 'service.model': { obj: { data: { zoo: "baz", foo: "bar" }}}}},
+					null,
+					model => expect(model.obj.foo).toBe("bar")
+				],
+				[ // Changed count in data value object
+					{ models: { 'service.model': { obj: { data: { foo: "bar", zoo: "baz" }}}}},
+					{ models: { 'service.model': { obj: { data: { foo: "bar" }}}}},
+					{ obj: { foo: "bar", zoo: "baz" }},
+					model => expect(model.obj.zoo).toBe(undefined)
+				],
+				[ // Changed value in data value object
+					{ models: { 'service.model': { obj: { data: { foo: "bar", zoo: "baz" }}}}},
+					{ models: { 'service.model': { obj: { data: { foo: "bar", zoo: "buzz" }}}}},
+					{ obj: { foo: "bar", zoo: "baz" }},
+					model => expect(model.obj.zoo).toBe("buzz")
+				],
+				[ // Changed property name in data value object
+					{ models: { 'service.model': { obj: { data: { foo: "bar", zoo: "baz" }}}}},
+					{ models: { 'service.model': { obj: { data: { foo: "bar", boo: "baz" }}}}},
+					{ obj: { foo: "bar", zoo: "baz" }},
+					model => expect(model.obj.boo).toBe("baz")
+				],
+				[ // Changed primitive and data value
+					{ models: { 'service.model': { a: { data: 42 }, b: 12 }}},
+					{ models: { 'service.model': { a: 42, b: { data: 12 }}}},
+					null,
+					model => {
+						expect(model.a).toBe(42);
+						expect(model.b).toBe(12);
+					}
+				],
 			])("given firstModel=%p, and secondModel=%p gives changed values %p", (firstModel, secondModel, expectedChanged, validate) => {
 				return getServerResource('service.model', firstModel).then(model => {
 					model.on('change', cb);
@@ -1409,6 +1464,20 @@ describe("ResClient", () => {
 					{ collections: { 'service.collection': [ "foo", { rid: 'service.ref2' }], 'service.ref2': [ "baz" ] }},
 					[ "foo", [ "baz" ]],
 					2,
+					null
+				],
+				[ // Changed data value
+					{ collections: { 'service.collection': [ "foo", { data: { foo: "bar" }}] }},
+					{ collections: { 'service.collection': [ "foo", { data: { foo: "baz" }}] }},
+					[ "foo", { foo: "baz" }],
+					2,
+					null
+				],
+				[ // Unchanged data value
+					{ collections: { 'service.collection': [{ data: { foo: "bar", zoo: "baz" }}, { data: [ "foo" ] }, { data: null }] }},
+					{ collections: { 'service.collection': [{ data: { zoo: "baz", foo: "bar" }}, { data: [ "foo" ] }, null ] }},
+					[{ zoo: "baz", foo: "bar" }, [ "foo" ], null ],
+					0,
 					null
 				]
 			])("given firstCollection=%j, and secondCollection=%j gives changed values %j", (firstCollection, secondCollection, expectedCollection, expectedEvents, validate) => {
