@@ -238,7 +238,7 @@ class ResCollection {
 
 	[Symbol.iterator]() {
 		let i = 0,
-			a = this._list,
+			a = this._list || [],
 			l = a.length;
 
 		return {

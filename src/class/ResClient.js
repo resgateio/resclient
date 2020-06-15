@@ -1,11 +1,13 @@
 
-import { eventBus } from 'modapp';
+import eventBus from 'modapp-eventbus';
 import { obj } from 'modapp-utils';
 import CacheItem from './CacheItem';
 import TypeList from './TypeList';
 import ResCollection from './ResCollection';
 import ResModel from './ResModel';
 import ResError from './ResError';
+import ResRef from './ResRef';
+import equal from './equal';
 
 const defaultModelFactory = function(api, rid) {
 	return new ResModel(api, rid);
@@ -27,6 +29,10 @@ const versionToInt = function(version) {
 	return v;
 };
 
+const getRID = function(v) {
+	return v !== null && typeof v === 'object' && typeof v.getResourceId === 'function' ? v.getResourceId() : null;
+};
+
 // Resource types
 const typeCollection = 'collection';
 const typeModel = 'model';
@@ -44,8 +50,9 @@ const stateDelete = 1;
 const stateKeep = 2;
 const stateStale = 3;
 // RES Protocol version
+const supportedProtocol = "1.2.1";
 const legacyProtocol = versionToInt("1.1.1");
-const supportedProtocol = "1.2.0";
+const v1_2_1 = versionToInt("1.2.1");
 
 /**
  * Connect event emitted on connect.
@@ -123,16 +130,9 @@ class ResClient {
 				id: typeModel,
 				list: new TypeList(defaultModelFactory),
 				prepareData: dta => {
-					let o = Object.assign({}, dta);
-					let v;
-					for (let k in o) {
-						v = o[k];
-						// Is the value a reference, get the actual item from cache
-						if (typeof v === 'object' && v !== null && v.rid) {
-							let ci = this.cache[v.rid];
-							ci.addIndirect();
-							o[k] = ci.item;
-						}
+					let o = {};
+					for (let k in dta) {
+						o[k] = this._prepareValue(dta[k], true);
 					}
 					return o;
 				},
@@ -142,15 +142,7 @@ class ResClient {
 			collection: {
 				id: typeCollection,
 				list: new TypeList(defaultCollectionFactory),
-				prepareData: dta => dta.map(v => {
-					// Is the value a reference, get the actual item from cache
-					if (typeof v === 'object' && v !== null && v.rid) {
-						let ci = this.cache[v.rid];
-						ci.addIndirect();
-						return ci.item;
-					}
-					return v;
-				}),
+				prepareData: dta => dta.map(v => this._prepareValue(v, true)),
 				getFactory: function(rid) { return this.list.getFactory(rid); },
 				synchronize: this._syncCollection.bind(this)
 			},
@@ -552,7 +544,7 @@ class ResClient {
 		let handled = false;
 		switch (event) {
 		case 'change':
-			handled = this._handleChangeEvent(cacheItem, event, data.data);
+			handled = this._handleChangeEvent(cacheItem, event, data.data, false);
 			break;
 
 		case 'add':
@@ -573,7 +565,7 @@ class ResClient {
 		}
 	}
 
-	_handleChangeEvent(cacheItem, event, data) {
+	_handleChangeEvent(cacheItem, event, data, reset) {
 		if (cacheItem.type !== typeModel) {
 			return false;
 		}
@@ -582,102 +574,85 @@ class ResClient {
 
 		// Set deleted properties to undefined
 		let item = cacheItem.item;
-		let rm = {};
-		let v, ov, ci, r;
+		let rid;
 		let vals = data.values;
 		for (let k in vals) {
-			v = vals[k];
-			if (typeof v === 'object' && v !== null) {
-				if (v.action === 'delete') {
-					vals[k] = undefined;
-				} else if (v.rid) {
-					ci = this.cache[v.rid];
-					vals[k] = ci.item;
-					if (rm.hasOwnProperty(v.rid)) {
-						rm[v.rid]--;
-					} else {
-						rm[v.rid] = -1;
-					}
-				} else {
-					throw new Error("Unsupported model change value: ", v);
-				}
-			}
+			vals[k] = this._prepareValue(vals[k]);
+		}
 
-			ov = item[k];
-			if (this._isResource(ov)) {
-				let rid = ov.getResourceId();
-				if (rm.hasOwnProperty(rid)) {
-					rm[rid]++;
-				} else {
-					rm[rid] = 1;
-				}
+		// Update the model with new values
+		let changed = item.__update(vals, reset);
+		if (!changed) {
+			return false;
+		}
+
+		// Used changed object to determine which resource references has been
+		// added or removed.
+		let ind = {};
+		for (let k in changed) {
+			if ((rid = getRID(changed[k]))) {
+				ind[rid] = (ind[rid] || 0) - 1;
+			}
+			if ((rid = getRID(vals[k]))) {
+				ind[rid] = (ind[rid] || 0) + 1;
 			}
 		}
 
-		// Remove indirect reference to resources no longer referenced in the model
-		for (let rid in rm) {
-			r = rm[rid];
-			ci = this.cache[rid];
-			ci.removeIndirect(r);
-			if (r > 0) {
+		// Remove indirect reference to resources no longer referenced in the
+		// model
+		for (rid in ind) {
+			let d = ind[rid];
+			let ci = this.cache[rid];
+			ci.addIndirect(d);
+			if (d < 0) {
 				this._tryDelete(ci);
 			}
 		}
 
-		// Update the model with new values
-		let changed = cacheItem.item.__update(vals);
-		if (changed) {
-			this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + cacheItem.rid + '.' + event, changed);
-		}
-
+		this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + cacheItem.rid + '.' + event, changed);
 		return true;
 	}
 
-	_handleAddEvent(cacheItem, event, data) {
-		if (cacheItem.type !== typeCollection) {
+	_handleAddEvent(ci, event, data) {
+		if (ci.type !== typeCollection) {
 			return false;
 		}
 
-		let v = data.value;
+		this._cacheResources(data);
+		let v = this._prepareValue(data.value, true);
 		let idx = data.idx;
 
-		// Get resource if value is a resource reference
-		if (v !== null && typeof v === 'object' && v.rid) {
-			this._cacheResources(data);
-			let ci = this.cache[v.rid];
-			ci.addIndirect();
-			v = ci.item;
-		}
-		cacheItem.item.__add(v, idx);
-		this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + cacheItem.rid + '.' + event, { item: v, idx });
+		ci.item.__add(v, idx);
+		this.eventBus.emit(ci.item, this.namespace + '.resource.' + ci.rid + '.' + event, { item: v, idx });
 		return true;
 	}
 
-	_handleRemoveEvent(cacheItem, event, data) {
-		if (cacheItem.type !== typeCollection) {
+	_handleRemoveEvent(ci, event, data) {
+		if (ci.type !== typeCollection) {
 			return false;
 		}
 
 		let idx = data.idx;
-		let item = cacheItem.item.__remove(idx);
-		this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + cacheItem.rid + '.' + event, { item, idx });
+		let item = ci.item.__remove(idx);
+		this.eventBus.emit(ci.item, this.namespace + '.resource.' + ci.rid + '.' + event, { item, idx });
 
-		if (this._isResource(item)) {
-			let refItem = this.cache[item.getResourceId()];
+		let rid = getRID(item);
+		if (rid) {
+			let refItem = this.cache[rid];
 			if (!refItem) {
 				throw new Error("Removed model is not in cache");
 			}
 
-			refItem.removeIndirect();
+			refItem.addIndirect(-1);
 			this._tryDelete(refItem);
 		}
 		return true;
 	}
 
-	_handleUnsubscribeEvent(cacheItem) {
-		cacheItem.addSubscribed(0);
-		this._tryDelete(cacheItem);
-		this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + cacheItem.rid + '.unsubscribe', { item: cacheItem.item });
+	_handleUnsubscribeEvent(ci) {
+		ci.addSubscribed(0);
+		this._tryDelete(ci);
+		this.eventBus.emit(ci.item, this.namespace + '.resource.' + ci.rid + '.unsubscribe', { item: ci.item });
 		return true;
 	}
 
@@ -993,7 +968,7 @@ class ResClient {
 			for (let v of item) {
 				ri = this._getRefItem(v);
 				if (ri) {
-					ri.removeIndirect();
+					ri.addIndirect(-1);
 				}
 			}
 			break;
@@ -1002,7 +977,7 @@ class ResClient {
 				if (item.hasOwnProperty(k)) {
 					ri = this._getRefItem(item[k]);
 					if (ri) {
-						ri.removeIndirect();
+						ri.addIndirect(-1);
 					}
 				}
 			}
@@ -1012,15 +987,11 @@ class ResClient {
 		this._removeStale(ci.rid);
 	}
 
-	_isResource(v) {
-		return v !== null && typeof v === 'object' && typeof v.getResourceId === 'function';
-	}
-
 	_getRefItem(v) {
-		if (!this._isResource(v)) {
+		let rid = getRID(v);
+		if (!rid) {
 			return null;
 		}
-		let rid = v.getResourceId();
 		let refItem = this.cache[rid];
 		// refItem not in cache means
 		// item has been deleted as part of
@@ -1031,14 +1002,14 @@ class ResClient {
 		return refItem;
 	}
 
-	_cacheResources(resources) {
-		if (!resources) {
+	_cacheResources(r) {
+		if (!r || !(r.models || r.collections || r.errors)) {
 			return;
 		}
 
 		let sync = {};
-		resourceTypes.forEach(t => (sync[t] = this._createItems(resources[t + 's'], this.types[t])));
-		resourceTypes.forEach(t => this._initItems(resources[t + 's'], this.types[t]));
+		resourceTypes.forEach(t => (sync[t] = this._createItems(r[t + 's'], this.types[t])));
+		resourceTypes.forEach(t => this._initItems(r[t + 's'], this.types[t]));
 		resourceTypes.forEach(t => this._syncItems(sync[t], this.types[t]));
 	}
 
@@ -1101,7 +1072,7 @@ class ResClient {
 	}
 
 	_syncModel(cacheItem, data) {
-		this._handleChangeEvent(cacheItem, 'change', { values: data });
+		this._handleChangeEvent(cacheItem, 'change', { values: data }, true);
 	}
 
 	_syncCollection(cacheItem, data) {
@@ -1112,12 +1083,7 @@ class ResClient {
 			a[i] = collection.atIndex(i);
 		}
 
-		let b = data.map(v => (
-			v != null && typeof v === 'object' && v.rid
-				// Is the value a reference, get the actual item from cache
-				? this.cache[v.rid].item
-				: v
-		));;
+		let b = data.map(v => this._prepareValue(v));
 		this._patchDiff(a, b,
 			(id, m, n, idx) => {},
 			(id, n, idx) => this._handleAddEvent(cacheItem, 'add', {
@@ -1134,13 +1100,13 @@ class ResClient {
 		let t, i, j, s = 0, aa, bb, m = a.length, n = b.length;
 
 		// Trim of matches at the start and end
-		while (s < m && s < n && a[s] === b[s]) {
+		while (s < m && s < n && equal(a[s], b[s])) {
 			s++;
 		}
 		if (s === m && s === n) {
 			return;
 		}
-		while (s < m && s < n && a[m - 1] === b[n - 1]) {
+		while (s < m && s < n && equal(a[m - 1], b[n - 1])) {
 			m--;
 			n--;
 		}
@@ -1171,7 +1137,7 @@ class ResClient {
 
 		for (i = 0; i < m; i++) {
 			for (j = 0; j < n; j++) {
-				c[i + 1][j + 1] = aa[i] === bb[j]
+				c[i + 1][j + 1] = equal(aa[i], bb[j])
 					? c[i][j] + 1
 					: Math.max(c[i + 1][j], c[i][j + 1]);
 			}
@@ -1188,7 +1154,7 @@ class ResClient {
 		while (true) {
 			m = i - 1;
 			n = j - 1;
-			if (i > 0 && j > 0 && aa[m] === bb[n]) {
+			if (i > 0 && j > 0 && equal(aa[m], bb[n])) {
 				onKeep(aa[m], m + s, n + s, --idx);
 				i--;
 				j--;
@@ -1226,14 +1192,22 @@ class ResClient {
 		this._subscribeReferred(ci);
 
 		let i = ci.subscribed;
-		while (i--) {
-			this._send('unsubscribe', ci.rid)
-				.then(() => {
-					ci.addSubscribed(-1);
-					this._tryDelete(ci);
-				})
-				.catch(err => this._tryDelete(ci));
+		if (this.protocol < v1_2_1) {
+			while (i--) {
+				this._sendUnsubscribe(ci, 1);
+			}
+		} else {
+			this._sendUnsubscribe(ci, i);
 		}
+	}
+
+	_sendUnsubscribe(ci, count) {
+		this._send('unsubscribe', ci.rid, null, count > 1 ? { count } : null)
+			.then(() => {
+				ci.addSubscribed(-count);
+				this._tryDelete(ci);
+			})
+			.catch(() => this._tryDelete(ci));
 	}
 
 	_subscribeReferred(ci) {
@@ -1307,6 +1281,33 @@ class ResClient {
 			}
 			break;
 		}
+	}
+
+	_prepareValue(v, addIndirect) {
+		if (v !== null && typeof v == 'object') {
+			if (v.rid) {
+				// Resource reference
+				if (v.soft) {
+					// Soft reference
+					v = new ResRef(this, v.rid);
+				} else {
+					// Non-soft reference
+					let ci = this.cache[v.rid];
+					if (addIndirect) {
+						ci.addIndirect();
+					}
+					v = ci.item;
+				}
+			} else if (v.hasOwnProperty('data')) {
+				// Data value
+				v = v.data;
+			} else if (v.action === 'delete') {
+				v = undefined;
+			} else {
+				throw new Error("Invalid value: " + JSON.stringify(v));
+			}
+		}
+		return v;
 	}
 }
 

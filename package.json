@@ -1,6 +1,6 @@
 {
   "name": "resclient",
-  "version": "2.1.2",
+  "version": "2.2.0",
   "description": "Resgate client implementing the RES-Client Protocol.",
   "main": "lib/index.js",
   "module": "es/index.js",
@@ -8,8 +8,7 @@
   "files": [
     "dist",
     "lib",
-    "es",
-    "src"
+    "es"
   ],
   "scripts": {
     "clean": "rimraf lib dist es coverage",
@@ -36,25 +35,24 @@
   "license": "MIT",
   "homepage": "https://github.com/resgateio/resclient",
   "devDependencies": {
-    "@babel/cli": "^7.7.4",
-    "@babel/core": "^7.7.4",
-    "@babel/preset-env": "^7.7.4",
-    "babel-jest": "^24.8.0",
-    "coveralls": "^3.0.5",
-    "cross-env": "^5.2.0",
-    "eslint": "^5.16.0",
-    "jest": "^24.8.0",
-    "jsdoc-to-markdown": "^5.0.0",
+    "@babel/cli": "^7.10.1",
+    "@babel/core": "^7.10.2",
+    "@babel/preset-env": "^7.10.2",
+    "@rollup/plugin-babel": "^5.0.3",
+    "@rollup/plugin-node-resolve": "^8.0.1",
+    "babel-jest": "^26.0.1",
+    "coveralls": "^3.1.0",
+    "cross-env": "^7.0.2",
+    "eslint": "^7.2.0",
+    "jest": "^26.0.1",
+    "jsdoc-to-markdown": "^6.0.1",
     "mock-socket": "^7.1.0",
-    "rimraf": "^2.6.2",
-    "rollup": "^1.27.5",
-    "rollup-plugin-babel": "^4.3.3",
-    "rollup-plugin-commonjs": "^9.3.4",
-    "rollup-plugin-node-resolve": "^4.2.4",
-    "rollup-plugin-uglify": "^6.0.2"
+    "rimraf": "^3.0.2",
+    "rollup": "^2.14.0",
+    "rollup-plugin-terser": "^6.1.0"
   },
   "dependencies": {
-    "modapp": "^2.3.3",
-    "modapp-utils": "^1.2.1"
+    "modapp-eventbus": "^1.0.1",
+    "modapp-utils": "^1.3.0"
   }
 }
