@@ -52,7 +52,7 @@ const stateStale = 3;
 // RES Protocol version
 const supportedProtocol = "1.2.1";
 const legacyProtocol = versionToInt("1.1.1");
-const v1_2_0 = versionToInt("1.2.0");
+const v1_2_1 = versionToInt("1.2.1");
 
 /**
  * Connect event emitted on connect.
@@ -1192,7 +1192,7 @@ class ResClient {
 		this._subscribeReferred(ci);
 
 		let i = ci.subscribed;
-		if (this.protocol <= v1_2_0) {
+		if (this.protocol < v1_2_1) {
 			while (i--) {
 				this._sendUnsubscribe(ci, 1);
 			}
