@@ -52,7 +52,7 @@ const stateStale = 3;
 // RES Protocol version
 const supportedProtocol = "1.2.1";
 const legacyProtocol = versionToInt("1.1.1");
-const v1_2_0 = versionToInt("1.2.0");
+const v1_2_1 = versionToInt("1.2.1");
 
 /**
  * Connect event emitted on connect.
@@ -130,20 +130,9 @@ class ResClient {
 				id: typeModel,
 				list: new TypeList(defaultModelFactory),
 				prepareData: dta => {
-					let o = Object.assign({}, dta);
-					let v;
-					for (let k in o) {
-						v = o[k];
-						// Is the value a reference, get the actual item from cache
-						if (typeof v === 'object' && v !== null && v.rid) {
-							if (v.soft) {
-								o[k] = new ResRef(this, v.rid);
-							} else {
-								let ci = this.cache[v.rid];
-								ci.addIndirect();
-								o[k] = ci.item;
-							}
-						}
+					let o = {};
+					for (let k in dta) {
+						o[k] = this._prepareValue(dta[k], true);
 					}
 					return o;
 				},
@@ -153,19 +142,7 @@ class ResClient {
 			collection: {
 				id: typeCollection,
 				list: new TypeList(defaultCollectionFactory),
-				prepareData: dta => dta.map(v => {
-					// Is the value a reference, get the actual item from cache
-					if (typeof v === 'object' && v !== null && v.rid) {
-						if (v.soft) {
-							return new ResRef(this, v.rid);
-						} else {
-							let ci = this.cache[v.rid];
-							ci.addIndirect();
-							return ci.item;
-						}
-					}
-					return v;
-				}),
+				prepareData: dta => dta.map(v => this._prepareValue(v, true)),
 				getFactory: function(rid) { return this.list.getFactory(rid); },
 				synchronize: this._syncCollection.bind(this)
 			},
@@ -597,21 +574,10 @@ class ResClient {
 
 		// Set deleted properties to undefined
 		let item = cacheItem.item;
-		let v, rid;
+		let rid;
 		let vals = data.values;
 		for (let k in vals) {
-			v = vals[k];
-			if (typeof v === 'object' && v !== null) {
-				if (v.action === 'delete') {
-					vals[k] = undefined;
-				} else if (v.rid) {
-					vals[k] = v.soft
-						? new ResRef(this, v.rid)
-						: this.cache[v.rid].item;
-				} else {
-					throw new Error("Unsupported model change value: ", v);
-				}
-			}
+			vals[k] = this._prepareValue(vals[k]);
 		}
 
 		// Update the model with new values
@@ -647,38 +613,28 @@ class ResClient {
 		return true;
 	}
 
-	_handleAddEvent(cacheItem, event, data) {
-		if (cacheItem.type !== typeCollection) {
+	_handleAddEvent(ci, event, data) {
+		if (ci.type !== typeCollection) {
 			return false;
 		}
 
-		let v = data.value;
+		this._cacheResources(data);
+		let v = this._prepareValue(data.value, true);
 		let idx = data.idx;
 
-		// Get resource if value is a resource reference
-		if (v !== null && typeof v === 'object' && v.rid) {
-			if (v.soft) {
-				v = new ResRef(this, v.rid);
-			} else {
-				this._cacheResources(data);
-				let ci = this.cache[v.rid];
-				ci.addIndirect();
-				v = ci.item;
-			}
-		}
-		cacheItem.item.__add(v, idx);
-		this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + cacheItem.rid + '.' + event, { item: v, idx });
+		ci.item.__add(v, idx);
+		this.eventBus.emit(ci.item, this.namespace + '.resource.' + ci.rid + '.' + event, { item: v, idx });
 		return true;
 	}
 
-	_handleRemoveEvent(cacheItem, event, data) {
-		if (cacheItem.type !== typeCollection) {
+	_handleRemoveEvent(ci, event, data) {
+		if (ci.type !== typeCollection) {
 			return false;
 		}
 
 		let idx = data.idx;
-		let item = cacheItem.item.__remove(idx);
-		this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + cacheItem.rid + '.' + event, { item, idx });
+		let item = ci.item.__remove(idx);
+		this.eventBus.emit(ci.item, this.namespace + '.resource.' + ci.rid + '.' + event, { item, idx });
 
 		let rid = getRID(item);
 		if (rid) {
@@ -693,10 +649,10 @@ class ResClient {
 		return true;
 	}
 
-	_handleUnsubscribeEvent(cacheItem) {
-		cacheItem.addSubscribed(0);
-		this._tryDelete(cacheItem);
-		this.eventBus.emit(cacheItem.item, this.namespace + '.resource.' + cacheItem.rid + '.unsubscribe', { item: cacheItem.item });
+	_handleUnsubscribeEvent(ci) {
+		ci.addSubscribed(0);
+		this._tryDelete(ci);
+		this.eventBus.emit(ci.item, this.namespace + '.resource.' + ci.rid + '.unsubscribe', { item: ci.item });
 		return true;
 	}
 
@@ -1046,14 +1002,14 @@ class ResClient {
 		return refItem;
 	}
 
-	_cacheResources(resources) {
-		if (!resources) {
+	_cacheResources(r) {
+		if (!r || !(r.models || r.collections || r.errors)) {
 			return;
 		}
 
 		let sync = {};
-		resourceTypes.forEach(t => (sync[t] = this._createItems(resources[t + 's'], this.types[t])));
-		resourceTypes.forEach(t => this._initItems(resources[t + 's'], this.types[t]));
+		resourceTypes.forEach(t => (sync[t] = this._createItems(r[t + 's'], this.types[t])));
+		resourceTypes.forEach(t => this._initItems(r[t + 's'], this.types[t]));
 		resourceTypes.forEach(t => this._syncItems(sync[t], this.types[t]));
 	}
 
@@ -1127,11 +1083,7 @@ class ResClient {
 			a[i] = collection.atIndex(i);
 		}
 
-		let b = data.map(v => (
-			v != null && typeof v === 'object' && v.rid
-				? (v.soft ? new ResRef(this, v.rid) : this.cache[v.rid].item)
-				: v
-		));;
+		let b = data.map(v => this._prepareValue(v));
 		this._patchDiff(a, b,
 			(id, m, n, idx) => {},
 			(id, n, idx) => this._handleAddEvent(cacheItem, 'add', {
@@ -1240,7 +1192,7 @@ class ResClient {
 		this._subscribeReferred(ci);
 
 		let i = ci.subscribed;
-		if (this.protocol <= v1_2_0) {
+		if (this.protocol < v1_2_1) {
 			while (i--) {
 				this._sendUnsubscribe(ci, 1);
 			}
@@ -1329,6 +1281,33 @@ class ResClient {
 			}
 			break;
 		}
+	}
+
+	_prepareValue(v, addIndirect) {
+		if (v !== null && typeof v == 'object') {
+			if (v.rid) {
+				// Resource reference
+				if (v.soft) {
+					// Soft reference
+					v = new ResRef(this, v.rid);
+				} else {
+					// Non-soft reference
+					let ci = this.cache[v.rid];
+					if (addIndirect) {
+						ci.addIndirect();
+					}
+					v = ci.item;
+				}
+			} else if (v.hasOwnProperty('data')) {
+				// Data value
+				v = v.data;
+			} else if (v.action === 'delete') {
+				v = undefined;
+			} else {
+				throw new Error("Invalid value: " + JSON.stringify(v));
+			}
+		}
+		return v;
 	}
 }
 
