@@ -197,8 +197,12 @@ class ResClient {
 		this.tryConnect = false;
 
 		if (this.ws) {
-			this.ws.close();
-			this._connectReject({ code: 'system.disconnect', message: "Disconnect called" });
+			let ws = this.ws;
+			let err = { code: 'system.disconnect', message: "Disconnect called" };
+			ws.onclose = null;
+			this._handleOnclose(err);
+			ws.close();
+			this._connectReject(err);
 		}
 	}
 
@@ -720,8 +724,6 @@ class ResClient {
 	 * @private
 	 */
 	_handleOnopen(e) {
-		this.connected = true;
-
 		this._sendNow('version', { protocol: this.supportedProtocol })
 			.then(ver => {
 				this.protocol = versionToInt(ver.protocol) || legacyProtocol;
@@ -735,8 +737,16 @@ class ResClient {
 				}
 				throw err;
 			})
-			.then(() => this.onConnect ? this.onConnect(this) : null)
 			.then(() => {
+				if (this.onConnect) {
+					this.connected = true;
+					let promise = this.onConnect(this);
+					this.connected = false;
+					return promise;
+				}
+			})
+			.then(() => {
+				this.connected = true;
 				this._subscribeToAllStale();
 				this._emit('connect', e);
 				this._connectResolve();
