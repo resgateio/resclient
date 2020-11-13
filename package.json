@@ -1,6 +1,6 @@
 {
   "name": "resclient",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "Resgate client implementing the RES-Client Protocol.",
   "main": "lib/index.js",
   "module": "es/index.js",
