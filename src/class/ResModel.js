@@ -184,7 +184,7 @@ class ResModel {
 	toJSON() {
 		let o = this._definition
 			? obj.copy(this._props, this._definition)
-			: this._props;
+			: Object.assign({}, this._props);
 		for (let k in o) {
 			var v = o[k];
 			if (typeof v === 'object' && v !== null && v.toJSON) {
