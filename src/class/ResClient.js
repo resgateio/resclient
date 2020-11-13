@@ -198,10 +198,11 @@ class ResClient {
 
 		if (this.ws) {
 			let ws = this.ws;
+			let err = { code: 'system.disconnect', message: "Disconnect called" };
 			ws.onclose = null;
-			this._handleOnclose("disconnect() called");
+			this._handleOnclose(err);
 			ws.close();
-			this._connectReject({ code: 'system.disconnect', message: "Disconnect called" });
+			this._connectReject(err);
 		}
 	}
 
