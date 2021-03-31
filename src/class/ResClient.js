@@ -385,24 +385,36 @@ class ResClient {
 		return this._send('call', modelId, 'set', props);
 	}
 
-	resourceOn(rid, events, handler) {
+	resourceOn(rid, events, handler, item) {
 		let cacheItem = this.cache[rid];
-		if (!cacheItem) {
-			throw new Error("Resource " + rid + " not found in cache");
+		if (cacheItem) {
+			if (!item || cacheItem.item === item) {
+				cacheItem.addDirect();
+			}
+			item = cacheItem.item;
+		} else {
+			console.warn("Resource " + rid + " not found in cache");
 		}
 
-		cacheItem.addDirect();
-		this.eventBus.on(cacheItem.item, events, handler, this.namespace + '.resource.' + rid);
+		if (item) {
+			this.eventBus.on(item, events, handler, this.namespace + '.resource.' + rid);
+		}
 	}
 
-	resourceOff(rid, events, handler) {
+	resourceOff(rid, events, handler, item) {
 		let cacheItem = this.cache[rid];
-		if (!cacheItem) {
-			throw new Error("Resource " + rid + " not found in cache");
+		if (cacheItem) {
+			if (!item || cacheItem.item === item) {
+				cacheItem.removeDirect();
+			}
+			item = cacheItem.item;
+		} else {
+			console.warn("Resource " + rid + " not found in cache");
 		}
 
-		cacheItem.removeDirect();
-		this.eventBus.off(cacheItem.item, events, handler, this.namespace + '.resource.' + rid);
+		if (item) {
+			this.eventBus.off(item, events, handler, this.namespace + '.resource.' + rid);
+		}
 	}
 
 	/**
@@ -446,6 +458,7 @@ class ResClient {
 
 			var json = JSON.stringify(req);
 			this.ws.send(json);
+			console.debug("RC > ", json);
 		});
 	}
 
@@ -724,6 +737,7 @@ class ResClient {
 	 * @private
 	 */
 	_handleOnopen(e) {
+		console.debug("RC : open");
 		this._sendNow('version', { protocol: this.supportedProtocol })
 			.then(ver => {
 				this.protocol = versionToInt(ver.protocol) || legacyProtocol;
@@ -764,6 +778,7 @@ class ResClient {
 	 * @private
 	 */
 	_handleOnerror(e) {
+		console.debug("RC error: ", e);
 		this._connectReject({ code: 'system.connectionError', message: "Connection error", data: e });
 	}
 
@@ -773,6 +788,7 @@ class ResClient {
 	 * @private
 	 */
 	_handleOnmessage(e) {
+		console.debug("RC < ", e.data);
 		this._receive(e.data);
 	}
 
@@ -782,6 +798,7 @@ class ResClient {
 	 * @private
 	 */
 	_handleOnclose(e) {
+		console.debug("RC close: ", e);
 		this.connectPromise = null;
 		this.ws = null;
 		if (this.connected) {

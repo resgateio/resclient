@@ -91,7 +91,7 @@ class ResCollection {
 	 * @returns {this}
 	 */
 	on(events, handler) {
-		this._api.resourceOn(this._rid, events, handler);
+		this._api.resourceOn(this._rid, events, handler, this);
 		return this;
 	}
 
@@ -103,7 +103,7 @@ class ResCollection {
 	 * @returns {this}
 	 */
 	off(events, handler) {
-		this._api.resourceOff(this._rid, events, handler);
+		this._api.resourceOff(this._rid, events, handler, this);
 		return this;
 	}
 
