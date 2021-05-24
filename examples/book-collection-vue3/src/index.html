@@ -3,8 +3,8 @@
 	<head>
 		<meta charset="UTF-8" />
 		<title>Book Collection Example</title>
-		<script src="https://cdn.jsdelivr.net/npm/resclient@latest/dist/resclient.min.js"></script>
-		<script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/resclient@latest/dist/resclient.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/vue@3"></script>
 		<style>
 			body {
 				background: #eee;
@@ -105,7 +105,8 @@
 		<!-- template for the book-list component -->
 		<script type="text/x-template" id="book-list-template">
 			<div class="book-list">
-				<book v-for="book in books" :key="book.id" :book="book" :books="books" @error="showError"></book>
+				<!-- The internal list array (books.list) enables reactive updates for collections -->
+				<book v-for="book in books.list" :key="book.id" :book="book" :books="books" @error="showError"></book>
 			</div>
 		</script>
 	</head>

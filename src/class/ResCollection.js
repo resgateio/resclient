@@ -82,6 +82,13 @@ class ResCollection {
 	}
 
 	/**
+	 * Internal collection array. Do not mutate directly.
+	 */
+	get list() {
+		return this._list;
+	}
+
+	/**
 	 * Attach a collection event handler function for one or more events.
 	 * If no event or handler is provided, the collection will still be considered listened to,
 	 * until a matching off call without arguments is made.
