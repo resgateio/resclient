@@ -57,6 +57,7 @@ client.get('example.mymodel').then(model => {
 | --- | ---
 | [React](examples/book-collection-react/) | React client implementation of the Book Collection example.
 | [Vue.js](examples/book-collection-vuejs/) | Vue.js client implementation of the Book Collection example.
+| [Vue 3](examples/book-collection-vue3/) | Vue 3 client implementation of the Book Collection example.
 | [Modapp](https://github.com/resgateio/resgate/tree/master/examples/book-collection) | Book Collection example from Resgate repository
 
 > **Note**
