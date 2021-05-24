@@ -259,9 +259,11 @@ class ResClient {
 	 * * The greater than symbol (>) matches one or more parts at the end of a resource name, and must be the last part.
 	 * @param {string} pattern Pattern of the model type.
 	 * @param {ResClient~modelFactory} factory Model factory callback
+	 * @returns {this}
 	 */
 	registerModelType(pattern, factory) {
 		this.types.model.list.addFactory(pattern, factory);
+		return this;
 	}
 
 	/**
@@ -288,9 +290,11 @@ class ResClient {
 	 * * The greater than symbol (>) matches one or more parts at the end of a resource name, and must be the last part.
 	 * @param {string} pattern Pattern of the collection type.
 	 * @param {ResClient~collectionFactory} factory Collection factory callback
+	 * @returns {this}
 	 */
 	registerCollectionType(pattern, factory) {
 		this.types.collection.list.addFactory(pattern, factory);
+		return this;
 	}
 
 	/**
@@ -299,7 +303,7 @@ class ResClient {
 	 * @returns {ResClient~collectionFactory} Unregistered collection factory callback
 	 */
 	unregisterCollectionType(pattern) {
-		return this.types.model.list.removeFactory(pattern);
+		return this.types.collection.list.removeFactory(pattern);
 	}
 
 	/**

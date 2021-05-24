@@ -40,9 +40,9 @@ ResClient represents a client connection to a RES API.
         * [.on(events, handler)](#ResClient+on)
         * [.off(events, [handler])](#ResClient+off)
         * [.setOnConnect(onConnect)](#ResClient+setOnConnect) ⇒ <code>this</code>
-        * [.registerModelType(pattern, factory)](#ResClient+registerModelType)
+        * [.registerModelType(pattern, factory)](#ResClient+registerModelType) ⇒ <code>this</code>
         * [.unregisterModelType(pattern)](#ResClient+unregisterModelType) ⇒ [<code>modelFactory</code>](#ResClient..modelFactory)
-        * [.registerCollectionType(pattern, factory)](#ResClient+registerCollectionType)
+        * [.registerCollectionType(pattern, factory)](#ResClient+registerCollectionType) ⇒ <code>this</code>
         * [.unregisterCollectionType(pattern)](#ResClient+unregisterCollectionType) ⇒ [<code>collectionFactory</code>](#ResClient..collectionFactory)
         * [.get(rid, [collectionFactory])](#ResClient+get) ⇒ <code>Promise.&lt;(ResModel\|ResCollection)&gt;</code>
         * [.call(rid, method, params)](#ResClient+call) ⇒ <code>Promise.&lt;object&gt;</code>
@@ -140,7 +140,7 @@ Sets the onConnect callback.
 
 <a name="ResClient+registerModelType"></a>
 
-### resClient.registerModelType(pattern, factory)
+### resClient.registerModelType(pattern, factory) ⇒ <code>this</code>
 Register a model type.
 The pattern may use the following wild cards:
 * The asterisk (*) matches any part at any level of the resource name.
@@ -167,7 +167,7 @@ Unregister a previously registered model type pattern.
 
 <a name="ResClient+registerCollectionType"></a>
 
-### resClient.registerCollectionType(pattern, factory)
+### resClient.registerCollectionType(pattern, factory) ⇒ <code>this</code>
 Register a collection type.
 The pattern may use the following wild cards:
 * The asterisk (*) matches any part at any level of the resource name.
@@ -352,6 +352,7 @@ ResCollection represents a collection provided over the RES API.
     * [new ResCollection(api, rid, [opt])](#new_ResCollection_new)
     * _instance_
         * [.length](#ResCollection+length)
+        * [.list](#ResCollection+list)
         * [.getClient()](#ResCollection+getClient) ⇒ [<code>ResClient</code>](#ResClient)
         * [.getResourceId()](#ResCollection+getResourceId) ⇒ <code>string</code>
         * [.on([events], [handler])](#ResCollection+on) ⇒ <code>this</code>
@@ -385,6 +386,12 @@ Creates an ResCollection instance
 
 ### resCollection.length
 Length of the collection
+
+**Kind**: instance property of [<code>ResCollection</code>](#ResCollection)  
+<a name="ResCollection+list"></a>
+
+### resCollection.list
+Internal collection array. Do not mutate directly.
 
 **Kind**: instance property of [<code>ResCollection</code>](#ResCollection)  
 <a name="ResCollection+getClient"></a>
