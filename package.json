@@ -1,6 +1,6 @@
 {
   "name": "resclient",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "description": "Resgate client implementing the RES-Client Protocol.",
   "main": "lib/index.js",
   "types": "types/index.d.ts",
@@ -9,7 +9,8 @@
   "files": [
     "dist",
     "lib",
-    "es"
+    "es",
+    "types"
   ],
   "scripts": {
     "clean": "rimraf lib dist es coverage types",
