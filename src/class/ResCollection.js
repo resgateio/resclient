@@ -1,15 +1,6 @@
 import { obj } from 'modapp-utils';
 
 /**
- * Add event emitted on any item being added to the collection.
- * @callback ResCollection~addCallback
- * @param {ResCollection~addEvent} event Add event data.
- * @param {ResCollection} collection Collection emitting event.
- * @param {string} event Event name including namespace.
- * @param {?string} action Event action.
- */
-
-/**
  * Add event data
  * @typedef {object} ResCollection~addEvent
  * @property {*} item Item being added to the collection.
@@ -17,9 +8,9 @@ import { obj } from 'modapp-utils';
  */
 
 /**
- * Remove event emitted on any item being added to the collection.
- * @callback ResCollection~removeCallback
- * @param {ResCollection~removeEvent} event Remove event data.
+ * Add event emitted on any item being added to the collection.
+ * @callback ResCollection~addCallback
+ * @param {ResCollection~addEvent} event Add event data.
  * @param {ResCollection} collection Collection emitting event.
  * @param {string} event Event name including namespace.
  * @param {?string} action Event action.
@@ -30,6 +21,15 @@ import { obj } from 'modapp-utils';
  * @typedef {object} ResCollection~removeEvent
  * @property {*} item Item being removed from the collection.
  * @property {number} idx Index from where the item was removed.
+ */
+
+/**
+ * Remove event emitted on any item being added to the collection.
+ * @callback ResCollection~removeCallback
+ * @param {ResCollection~removeEvent} event Remove event data.
+ * @param {ResCollection} collection Collection emitting event.
+ * @param {string} event Event name including namespace.
+ * @param {?string} action Event action.
  */
 
 /**
