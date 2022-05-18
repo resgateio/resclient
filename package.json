@@ -1,62 +1,62 @@
 {
-  "name": "@sysarb/resclient",
-  "version": "2.3.3",
-  "description": "Resgate client implementing the RES-Client Protocol.",
-  "main": "lib/index.js",
-  "types": "types/resclient.d.ts",
-  "module": "es/index.js",
-  "jsnext:main": "es/index.js",
-  "files": [
-    "dist",
-    "lib",
-    "es",
-    "types"
-  ],
-  "scripts": {
-    "clean": "rimraf lib dist es coverage",
-    "build": "npm run clean && npm run build:commonjs && npm run build:es && npm run build:umd && npm run build:umd:min && npm run build:docs",
-    "build:commonjs": "cross-env BABEL_ENV=commonjs babel src --out-dir lib",
-    "build:es": "cross-env BABEL_ENV=es babel src --out-dir es",
-    "build:umd": "cross-env BABEL_ENV=es NODE_ENV=development node_modules/.bin/rollup src/index.js --config --sourcemap --file dist/resclient.js",
-    "build:umd:min": "cross-env BABEL_ENV=es NODE_ENV=production rollup src/index.js --config --file dist/resclient.min.js",
-    "build:docs": "jsdoc2md -f ./src/class/ResClient.js -f ./src/class/ResCollection.js -f ./src/class/ResModel.js -f ./src/class/ResError.js -f ./src/def/eventCallback.js > ./docs/docs.md",
-    "eslint": "eslint src/**/*.js",
-    "jest": "jest src --coverage",
-    "test": "npm run eslint && npm run jest",
-    "coveralls": "jest --coverage --coverageReporters=text-lcov | coveralls",
-    "types": "npx -p typescript tsc src/index.js --declaration --allowJs --emitDeclarationOnly --outDir types"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/sysarb/resclient"
-  },
-  "jest": {
-    "testEnvironment": "jsdom",
-    "testURL": "http://localhost/"
-  },
-  "author": "Sysarb <hej@sysarb.se>",
-  "license": "MIT",
-  "homepage": "https://github.com/sysarb/resclient",
-  "devDependencies": {
-    "@babel/cli": "^7.12.1",
-    "@babel/core": "^7.12.3",
-    "@babel/preset-env": "^7.12.1",
-    "@rollup/plugin-babel": "^5.2.1",
-    "@rollup/plugin-node-resolve": "^8.4.0",
-    "babel-jest": "^26.6.3",
-    "coveralls": "^3.1.0",
-    "cross-env": "^7.0.2",
-    "eslint": "^7.13.0",
-    "jest": "^26.6.3",
-    "jsdoc-to-markdown": "^6.0.1",
-    "mock-socket": "^7.1.0",
-    "rimraf": "^3.0.2",
-    "rollup": "^2.33.1",
-    "rollup-plugin-terser": "^6.1.0",
-    "typescript": "^4.6.4"
-  },
-  "dependencies": {
-    "modapp-eventbus": "^1.7.0",
-    "modapp-utils": "^1.7.0"
-  }
+    "name": "@sysarb/resclient",
+    "version": "2.3.3",
+    "description": "Resgate client implementing the RES-Client Protocol.",
+    "main": "lib/index.js",
+    "types": "types/resclient.d.ts",
+    "module": "es/index.js",
+    "jsnext:main": "es/index.js",
+    "files": [
+        "dist",
+        "lib",
+        "es",
+        "types"
+    ],
+    "scripts": {
+        "clean": "rimraf lib dist es coverage",
+        "build": "npm run clean && npm run build:commonjs && npm run build:es && npm run build:umd && npm run build:umd:min && npm run build:docs",
+        "build:commonjs": "cross-env BABEL_ENV=commonjs babel src --out-dir lib",
+        "build:es": "cross-env BABEL_ENV=es babel src --out-dir es",
+        "build:umd": "cross-env BABEL_ENV=es NODE_ENV=development node_modules/.bin/rollup src/index.js --config --sourcemap --file dist/resclient.js",
+        "build:umd:min": "cross-env BABEL_ENV=es NODE_ENV=production rollup src/index.js --config --file dist/resclient.min.js",
+        "build:docs": "jsdoc2md -f ./src/class/ResClient.js -f ./src/class/ResCollection.js -f ./src/class/ResModel.js -f ./src/class/ResError.js -f ./src/def/eventCallback.js > ./docs/docs.md",
+        "eslint": "eslint src/**/*.js",
+        "jest": "jest src --coverage",
+        "test": "npm run eslint && npm run jest",
+        "coveralls": "jest --coverage --coverageReporters=text-lcov | coveralls",
+        "types": "npx -p typescript tsc src/index.js --declaration --allowJs --emitDeclarationOnly --outDir types"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/sysarb/resclient"
+    },
+    "jest": {
+        "testEnvironment": "jsdom",
+        "testURL": "http://localhost/"
+    },
+    "author": "Sysarb <hej@sysarb.se>",
+    "license": "MIT",
+    "homepage": "https://github.com/sysarb/resclient",
+    "devDependencies": {
+        "@babel/cli": "^7.17.10",
+        "@babel/core": "^7.17.12",
+        "@babel/preset-env": "^7.17.12",
+        "@rollup/plugin-babel": "^5.3.1",
+        "@rollup/plugin-node-resolve": "^13.3.0",
+        "babel-jest": "^28.1.0",
+        "coveralls": "^3.1.1",
+        "cross-env": "^7.0.3",
+        "eslint": "8.15.0",
+        "jest": "^26.6.3",
+        "jsdoc-to-markdown": "^7.1.1",
+        "mock-socket": "^7.1.0",
+        "rimraf": "^3.0.2",
+        "rollup": "^2.73.0",
+        "rollup-plugin-terser": "^7.0.2",
+        "typescript": "^4.6.4"
+    },
+    "dependencies": {
+        "modapp-eventbus": "^1.7.0",
+        "modapp-utils": "^1.7.0"
+    }
 }

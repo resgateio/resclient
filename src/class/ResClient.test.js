@@ -1,7 +1,8 @@
 import { Server } from 'mock-socket';
+
 import ResClient from './ResClient.js';
-import ResModel from './ResModel.js';
 import ResCollection from './ResCollection.js';
+import ResModel from './ResModel.js';
 import ResRef from './ResRef.js';
 
 class ResServer extends Server {
