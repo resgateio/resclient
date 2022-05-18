@@ -1,6 +1,6 @@
 {
   "name": "@sysarb/resclient",
-  "version": "2.3.3-rc1",
+  "version": "2.3.3",
   "description": "Resgate client implementing the RES-Client Protocol.",
   "main": "lib/index.js",
   "types": "types/resclient.d.ts",
