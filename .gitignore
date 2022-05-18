@@ -8,7 +8,6 @@ yarn.lock
 /dist
 /lib
 /es
-/types
 /*.tgz
 
 # Editor specifics

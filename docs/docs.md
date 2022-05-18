@@ -364,10 +364,10 @@ ResCollection represents a collection provided over the RES API.
         * [.auth(method, params)](#ResCollection+auth) ⇒ <code>Promise.&lt;object&gt;</code>
         * [.toArray()](#ResCollection+toArray) ⇒ <code>Array.&lt;\*&gt;</code>
     * _inner_
-        * [~addCallback](#ResCollection..addCallback) : <code>function</code>
         * [~addEvent](#ResCollection..addEvent) : <code>object</code>
-        * [~removeCallback](#ResCollection..removeCallback) : <code>function</code>
+        * [~addCallback](#ResCollection..addCallback) : <code>function</code>
         * [~removeEvent](#ResCollection..removeEvent) : <code>object</code>
+        * [~removeCallback](#ResCollection..removeCallback) : <code>function</code>
 
 <a name="new_ResCollection_new"></a>
 
@@ -506,20 +506,6 @@ Returns a shallow clone of the internal array.
 
 **Kind**: instance method of [<code>ResCollection</code>](#ResCollection)  
 **Returns**: <code>Array.&lt;\*&gt;</code> - Clone of internal array  
-<a name="ResCollection..addCallback"></a>
-
-### ResCollection~addCallback : <code>function</code>
-Add event emitted on any item being added to the collection.
-
-**Kind**: inner typedef of [<code>ResCollection</code>](#ResCollection)  
-
-| Param | Type | Description |
-| --- | --- | --- |
-| event | [<code>addEvent</code>](#ResCollection..addEvent) | Add event data. |
-| collection | [<code>ResCollection</code>](#ResCollection) | Collection emitting event. |
-| event | <code>string</code> | Event name including namespace. |
-| action | <code>string</code> | Event action. |
-
 <a name="ResCollection..addEvent"></a>
 
 ### ResCollection~addEvent : <code>object</code>
@@ -533,16 +519,16 @@ Add event data
 | item | <code>\*</code> | Item being added to the collection. |
 | idx | <code>number</code> | Index where item was added. |
 
-<a name="ResCollection..removeCallback"></a>
+<a name="ResCollection..addCallback"></a>
 
-### ResCollection~removeCallback : <code>function</code>
-Remove event emitted on any item being added to the collection.
+### ResCollection~addCallback : <code>function</code>
+Add event emitted on any item being added to the collection.
 
 **Kind**: inner typedef of [<code>ResCollection</code>](#ResCollection)  
 
 | Param | Type | Description |
 | --- | --- | --- |
-| event | [<code>removeEvent</code>](#ResCollection..removeEvent) | Remove event data. |
+| event | [<code>addEvent</code>](#ResCollection..addEvent) | Add event data. |
 | collection | [<code>ResCollection</code>](#ResCollection) | Collection emitting event. |
 | event | <code>string</code> | Event name including namespace. |
 | action | <code>string</code> | Event action. |
@@ -559,6 +545,20 @@ Remove event data
 | --- | --- | --- |
 | item | <code>\*</code> | Item being removed from the collection. |
 | idx | <code>number</code> | Index from where the item was removed. |
+
+<a name="ResCollection..removeCallback"></a>
+
+### ResCollection~removeCallback : <code>function</code>
+Remove event emitted on any item being added to the collection.
+
+**Kind**: inner typedef of [<code>ResCollection</code>](#ResCollection)  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| event | [<code>removeEvent</code>](#ResCollection..removeEvent) | Remove event data. |
+| collection | [<code>ResCollection</code>](#ResCollection) | Collection emitting event. |
+| event | <code>string</code> | Event name including namespace. |
+| action | <code>string</code> | Event action. |
 
 <a name="ResModel"></a>
 
