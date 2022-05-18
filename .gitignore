@@ -1,6 +1,5 @@
 node_modules
 coverage
-package-lock.json
 yarn.lock
 *.log
 
@@ -9,6 +8,3 @@ yarn.lock
 /lib
 /es
 /*.tgz
-
-# Editor specifics
-.vscode/*
