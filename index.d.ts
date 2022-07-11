@@ -1,3 +1,5 @@
+import type WebSocket from "ws";
+
 export class CacheItem<I = unknown> {
 	constructor(rid: string, unsubscribe: (item: CacheItem) => void);
 	rid: string;
