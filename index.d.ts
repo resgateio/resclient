@@ -129,3 +129,5 @@ export class TypeList {
 	removeFactory(pattern: string): Function | void;
 	getFactory(rid: string): Function;
 }
+
+export default ResClient;
