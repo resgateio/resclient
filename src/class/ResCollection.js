@@ -50,12 +50,12 @@ class ResCollection {
 			idCallback: { type: '?function' }
 		});
 
-		this._api = api;
-		this._rid = rid;
-		this._idCallback = opt.idCallback;
+		Object.defineProperty(this, '_api', { value: api, enumerable: false });
+		Object.defineProperty(this, '_rid', { value: rid, enumerable: false });
+		Object.defineProperty(this, '_idCallback', { value: opt.idCallback, enumerable: false });
 
-		this._map = this._idCallback ? {} : null;
-		this._list = null;
+		Object.defineProperty(this, '_map', { value: this._idCallback ? {} : null, enumerable: false, writable: true });
+		Object.defineProperty(this, '_list', { value: null, enumerable: false, writable: true });
 	}
 
 	/**

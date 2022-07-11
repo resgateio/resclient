@@ -155,11 +155,11 @@ class ResClient {
 		};
 
 		// Bind callbacks
-		this._handleOnopen = this._handleOnopen.bind(this);
-		this._handleOnerror = this._handleOnerror.bind(this);
-		this._handleOnmessage = this._handleOnmessage.bind(this);
-		this._handleOnclose = this._handleOnclose.bind(this);
-		this._unsubscribe = this._unsubscribe.bind(this);
+		Object.defineProperty(this, "_handleOnopen", { value: this._handleOnopen.bind(this), enumerable: false });
+		Object.defineProperty(this, "_handleOnerror", { value: this._handleOnerror.bind(this), enumerable: false });
+		Object.defineProperty(this, "_handleOnmessage", { value: this._handleOnmessage.bind(this), enumerable: false });
+		Object.defineProperty(this, "_handleOnclose", { value: this._handleOnclose.bind(this), enumerable: false });
+		Object.defineProperty(this, "_unsubscribe", { value: this._unsubscribe.bind(this), enumerable: false });
 	}
 
 	/**

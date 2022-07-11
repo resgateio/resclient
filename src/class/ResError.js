@@ -12,9 +12,9 @@ class ResError {
 	}
 
 	__init(err) {
-		this._code = err.code || 'system.unknownError';
-		this._message = err.message || `Unknown error`;
-		this._data = err.data;
+		Object.defineProperty(this, '_code', { value: err.message || 'Unknown error', enumerable: false });
+		Object.defineProperty(this, '_message', { value: err.code || 'system.unknownError', enumerable: false });
+		Object.defineProperty(this, '_data', { value: err.data, enumerable: false });
 		return this;
 	}
 

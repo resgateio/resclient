@@ -9,7 +9,7 @@ class CacheItem {
 	 */
 	constructor(rid, unsubscribe) {
 		this.rid = rid;
-		this._unsubscribe = unsubscribe;
+		Object.defineProperty(this, '_unsubscribe', { value: unsubscribe, enumerable: false });
 
 		this.type = null;
 		this.item = null;

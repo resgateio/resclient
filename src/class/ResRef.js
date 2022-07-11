@@ -9,8 +9,8 @@ class ResRef {
 	 * @param {string} rid Resource id.
 	 */
 	constructor(api, rid) {
-		this._rid = rid;
-		this._api = api;
+		Object.defineProperty(this, '_rid', { value: rid, enumerable: false });
+		Object.defineProperty(this, '_api', { value: api, enumerable: false });
 	}
 
 	/**
