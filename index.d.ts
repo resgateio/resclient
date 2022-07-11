@@ -21,8 +21,8 @@ export class CacheItem<I = unknown> {
 
 export interface ClientOptions {
 	onConnect?(): void;
-	namespace: string;
-	eventBus: any; // import("modapp-eventbus").EventBus
+	namespace?: string;
+	eventBus?: any; // import("modapp-eventbus").EventBus
 }
 
 export interface Type {
