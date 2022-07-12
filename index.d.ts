@@ -73,7 +73,7 @@ export class ResClient {
 
 export function isResError(input: unknown): input is ResError;
 
-export class ResCollection<O = unknown> {
+export class ResCollection<O extends ResModel = ResModel> {
 	constructor(api: ResClient, rid: string, opt?: { idCallback?: () => void; });
 	readonly length: number;
 	readonly list: Array<ResModel & O>;
@@ -81,14 +81,14 @@ export class ResCollection<O = unknown> {
 	getResourceId(): string;
 	on(events: string | null, handler: Function): this;
 	off(events: string | null, handler: Function): this;
-	get(id: string): ResModel & O | undefined
-	indexOf(model: ResModel & O): number;
-	atIndex(index: number): ResModel & O | undefined;
+	get(id: string): O | undefined
+	indexOf(model: O): number;
+	atIndex(index: number): O | undefined;
 	call<T = unknown>(method: string, params: Record<string, unknown>): Promise<T>;
 	auth<T = unknown>(method: string, params: Record<string, unknown>): Promise<T>;
-	toArray(): Array<ResModel & O>;
+	toArray(): Array<O>;
 	toJSON(): object;
-	[Symbol.iterator](): IterableIterator<ResModel & O>;
+	[Symbol.iterator](): IterableIterator<O>;
 }
 
 export class ResError {
