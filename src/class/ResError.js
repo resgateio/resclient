@@ -12,8 +12,8 @@ class ResError {
 	}
 
 	__init(err) {
-		Object.defineProperty(this, '_code', { value: err.message || 'Unknown error', enumerable: false });
-		Object.defineProperty(this, '_message', { value: err.code || 'system.unknownError', enumerable: false });
+		Object.defineProperty(this, '_code', { value: err.code || 'system.unknownError', enumerable: false });
+		Object.defineProperty(this, '_message', { value: err.message || 'Unknown error', enumerable: false });
 		Object.defineProperty(this, '_data', { value: err.data, enumerable: false });
 		return this;
 	}
