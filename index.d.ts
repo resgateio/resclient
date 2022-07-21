@@ -115,10 +115,10 @@ export class ResModel {
 	toJSON(): object;
 }
 
-export class ResRef {
+export class ResRef<T = unknown> {
 	constructor(api: ResClient, rid: string);
 	readonly rid: string;
-	get<T = unknown>(): Promise<T>;
+	get(): Promise<T>;
 	equals(other: ResRef): boolean;
 	toJSON(): object;
 }
