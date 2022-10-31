@@ -70,6 +70,7 @@ Creates a ResClient instance
 | [opt] | <code>object</code> | Optional parameters. |
 | [opt.onConnect] | <code>function</code> | On connect callback called prior resolving the connect promise and subscribing to stale resources. May return a promise. |
 | [opt.namespace] | <code>string</code> | Event bus namespace. Defaults to 'resclient'. |
+| [opt.debug] | <code>bool</code> | Flag to debug log all WebSocket communication. Defaults to false. |
 | [opt.eventBus] | <code>module:modapp~EventBus</code> | Event bus. |
 
 <a name="ResClient+supportedProtocol"></a>

@@ -96,6 +96,7 @@ class ResClient {
 	 * @param {object} [opt] Optional parameters.
 	 * @param {function} [opt.onConnect] On connect callback called prior resolving the connect promise and subscribing to stale resources. May return a promise.
 	 * @param {string} [opt.namespace] Event bus namespace. Defaults to 'resclient'.
+	 * @param {bool} [opt.debug] Flag to debug log all WebSocket communication. Defaults to false.
 	 * @param {module:modapp~EventBus} [opt.eventBus] Event bus.
 	 */
 	constructor(hostUrlOrFactory, opt) {
@@ -109,6 +110,7 @@ class ResClient {
 		obj.update(this, opt, {
 			onConnect: { type: '?function' },
 			namespace: { type: 'string', default: defaultNamespace },
+			debug: { type: 'boolean', default: false },
 			eventBus: { type: 'object', default: eventBus }
 		});
 
@@ -177,16 +179,20 @@ class ResClient {
 	 */
 	connect() {
 		this.tryConnect = true;
+		if (!this.connectPromise) {
+			this.connectPromise = new Promise((resolve, reject) => {
+				this.connectCallback = { resolve, reject };
+				this.ws = this.wsFactory();
 
-		return this.connectPromise = this.connectPromise || new Promise((resolve, reject) => {
-			this.connectCallback = { resolve, reject };
-			this.ws = this.wsFactory();
+				this.ws.onopen = this._handleOnopen;
+				this.ws.onerror = this._handleOnerror;
+				this.ws.onmessage = this._handleOnmessage;
+				this.ws.onclose = this._handleOnclose;
+			});
+			this.connectPromise.catch(err => this._emit('connectError', err));
+		}
 
-			this.ws.onopen = this._handleOnopen;
-			this.ws.onerror = this._handleOnerror;
-			this.ws.onmessage = this._handleOnmessage;
-			this.ws.onclose = this._handleOnclose;
-		});
+		return this.connectPromise;
 	}
 
 	/**
@@ -449,6 +455,9 @@ class ResClient {
 			};
 
 			var json = JSON.stringify(req);
+			if (this.debug) {
+				console.debug("<== " + req.id + ":" + json);
+			}
 			this.ws.send(json);
 		});
 	}
@@ -462,6 +471,9 @@ class ResClient {
 		let data = JSON.parse(json.trim());
 
 		if (data.hasOwnProperty('id')) {
+			if (this.debug) {
+				console.debug("==> " + data.id + ":" + json);
+			}
 
 			// Find the stored request
 			let req = this.requests[data.id];
@@ -477,6 +489,9 @@ class ResClient {
 				this._handleSuccessResponse(req, data);
 			}
 		} else if (data.hasOwnProperty('event')) {
+			if (this.debug) {
+				console.debug("--> " + json);
+			}
 			this._handleEvent(data);
 		} else {
 			throw new Error("Invalid message from server: " + json);
@@ -728,6 +743,9 @@ class ResClient {
 	 * @private
 	 */
 	_handleOnopen(e) {
+		if (this.debug) {
+			console.debug("ResClient open", e, this);
+		}
 		this._sendNow('version', { protocol: this.supportedProtocol })
 			.then(ver => {
 				this.protocol = versionToInt(ver.protocol) || legacyProtocol;
@@ -768,6 +786,9 @@ class ResClient {
 	 * @private
 	 */
 	_handleOnerror(e) {
+		if (this.debug) {
+			console.debug("ResClient error", e, this);
+		}
 		this._connectReject({ code: 'system.connectionError', message: "Connection error", data: e });
 	}
 
@@ -786,8 +807,12 @@ class ResClient {
 	 * @private
 	 */
 	_handleOnclose(e) {
+		if (this.debug) {
+			console.debug("ResClient close", e, this);
+		}
 		this.connectPromise = null;
 		this.ws = null;
+		let wasConnected = this.connected;
 		if (this.connected) {
 			this.connected = false;
 
@@ -813,7 +838,7 @@ class ResClient {
 		this.tryConnect = hasStale && this.tryConnect;
 
 		if (this.tryConnect) {
-			this._reconnect();
+			this._reconnect(wasConnected);
 		}
 	}
 
@@ -915,13 +940,13 @@ class ResClient {
 
 		let rid = ci.rid;
 		let r = refs[rid];
-		if (!r) {
-			refs[rid] = { ci, rc: ci.indirect - 1, st: stateNone };
-			return true;
+		if (r) {
+			r.rc--;
+			return false;
 		}
 
-		r.rc--;
-		return false;
+		refs[rid] = { ci, rc: ci.indirect - 1, st: stateNone };
+		return true;
 	}
 
 	/**
@@ -1243,7 +1268,11 @@ class ResClient {
 		this._tryDelete(cacheItem);
 	}
 
-	_reconnect() {
+	_reconnect(noDelay) {
+		if (noDelay) {
+			this.connect();
+			return;
+		}
 		setTimeout(() => {
 			if (!this.tryConnect) {
 				return;
