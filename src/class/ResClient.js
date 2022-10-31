@@ -179,16 +179,20 @@ class ResClient {
 	 */
 	connect() {
 		this.tryConnect = true;
+		if (!this.connectPromise) {
+			this.connectPromise = new Promise((resolve, reject) => {
+				this.connectCallback = { resolve, reject };
+				this.ws = this.wsFactory();
 
-		return this.connectPromise = this.connectPromise || new Promise((resolve, reject) => {
-			this.connectCallback = { resolve, reject };
-			this.ws = this.wsFactory();
+				this.ws.onopen = this._handleOnopen;
+				this.ws.onerror = this._handleOnerror;
+				this.ws.onmessage = this._handleOnmessage;
+				this.ws.onclose = this._handleOnclose;
+			});
+			this.connectPromise.catch(err => this._emit('connectError', err));
+		}
 
-			this.ws.onopen = this._handleOnopen;
-			this.ws.onerror = this._handleOnerror;
-			this.ws.onmessage = this._handleOnmessage;
-			this.ws.onclose = this._handleOnclose;
-		});
+		return this.connectPromise;
 	}
 
 	/**
