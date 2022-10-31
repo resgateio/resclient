@@ -38,9 +38,9 @@
   "license": "MIT",
   "homepage": "https://github.com/resgateio/resclient",
   "devDependencies": {
-    "@babel/cli": "^7.12.1",
-    "@babel/core": "^7.12.3",
-    "@babel/preset-env": "^7.12.1",
+    "@babel/cli": "^7.19.3",
+    "@babel/core": "^7.19.6",
+    "@babel/preset-env": "^7.19.4",
     "@rollup/plugin-babel": "^5.2.1",
     "@rollup/plugin-node-resolve": "^8.4.0",
     "babel-jest": "^26.6.3",
@@ -51,12 +51,12 @@
     "jsdoc-to-markdown": "^6.0.1",
     "mock-socket": "^7.1.0",
     "rimraf": "^3.0.2",
-    "rollup": "^2.33.1",
+    "rollup": "^2.79.1",
     "rollup-plugin-terser": "^6.1.0",
-    "typescript": "^4.4.4"
+    "typescript": "^4.8.4"
   },
   "dependencies": {
-    "modapp-eventbus": "^1.7.0",
-    "modapp-utils": "^1.7.0"
+    "modapp-eventbus": "^1.8.0",
+    "modapp-utils": "^1.8.0"
   }
 }
