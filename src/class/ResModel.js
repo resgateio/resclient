@@ -31,6 +31,9 @@ class ResModel {
 		this._rid = rid;
 		this._api = api;
 		this._props = {};
+		Object.defineProperty(this, '_rid', { value: rid, enumerable: false });
+		Object.defineProperty(this, '_api', { value: api, enumerable: false });
+		Object.defineProperty(this, '_props', { value: {}, enumerable: false });
 	}
 
 	/**
