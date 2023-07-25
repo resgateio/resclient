@@ -1,6 +1,6 @@
 {
   "name": "resclient",
-  "version": "2.4.0",
+  "version": "2.4.1",
   "description": "Resgate client implementing the RES-Client Protocol.",
   "main": "lib/index.js",
   "types": "types/index.d.ts",
@@ -48,7 +48,7 @@
     "cross-env": "^7.0.2",
     "eslint": "^7.13.0",
     "jest": "^26.6.3",
-    "jsdoc-to-markdown": "^6.0.1",
+    "jsdoc-to-markdown": "^8.0.0",
     "mock-socket": "^7.1.0",
     "rimraf": "^3.0.2",
     "rollup": "^2.79.1",
@@ -56,7 +56,7 @@
     "typescript": "^4.8.4"
   },
   "dependencies": {
-    "modapp-eventbus": "^1.8.0",
+    "modapp-eventbus": "^1.8.1",
     "modapp-utils": "^1.8.0"
   }
 }
