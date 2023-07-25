@@ -401,8 +401,9 @@ class ResClient {
 			throw new Error("Resource " + rid + " not found in cache");
 		}
 
-		cacheItem.addDirect();
 		this.eventBus.on(cacheItem.item, events, handler, this.namespace + '.resource.' + rid);
+
+		cacheItem.addDirect();
 	}
 
 	resourceOff(rid, events, handler) {
@@ -411,8 +412,9 @@ class ResClient {
 			throw new Error("Resource " + rid + " not found in cache");
 		}
 
+		this.eventBus.off(cacheItem.item, events, handler, this.namespace + '.resource.' + rid, true);
+
 		cacheItem.removeDirect();
-		this.eventBus.off(cacheItem.item, events, handler, this.namespace + '.resource.' + rid);
 	}
 
 	/**
