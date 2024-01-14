@@ -1,5 +1,3 @@
-const unsubscribeDelay = 5000; // ms
-
 class CacheItem {
 
 	/**
@@ -85,7 +83,7 @@ class CacheItem {
 			return;
 		}
 
-		this.unsubTimeout = setTimeout(() => this._unsubscribe(this), unsubscribeDelay);
+		this.unsubTimeout = this._unsubscribe(this, true);
 	}
 
 	addIndirect(n = 1) {
