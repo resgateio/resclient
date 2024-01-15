@@ -1,5 +1,3 @@
-const unsubscribeDelay = 5000; // ms
-
 class CacheItem {
 
 	/**
@@ -28,6 +26,12 @@ class CacheItem {
 		if (!this.subscribed && this.unsubTimeout) {
 			clearTimeout(this.unsubTimeout);
 			this.unsubTimeout = null;
+		}
+		// Going from no subscription to having a subscription, from getting the
+		// resource as a resource response, we should check if we should start
+		// an unsubscribe timer.
+		if (this.item && dir > 0 && this.subscribed == dir) {
+			this._checkUnsubscribe();
 		}
 	}
 
@@ -85,7 +89,7 @@ class CacheItem {
 			return;
 		}
 
-		this.unsubTimeout = setTimeout(() => this._unsubscribe(this), unsubscribeDelay);
+		this.unsubTimeout = this._unsubscribe(this, true);
 	}
 
 	addIndirect(n = 1) {

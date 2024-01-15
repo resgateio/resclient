@@ -42,8 +42,10 @@ const resourceTypes = [ typeModel, typeCollection, typeError ];
 const actionDelete = { action: 'delete' };
 // Default settings
 const defaultNamespace = 'resclient';
-const reconnectDelay = 3000;
-const subscribeStaleDelay = 2000;
+const defaultReconnectDelay = 3000;
+const defaultSubscribeStaleDelay = 2000;
+const defaultSubscribeRetryDelay = 10000;
+const defaultUnsubscribeDelay = 5000;
 // Traverse states
 const stateNone = 0;
 const stateDelete = 1;
@@ -96,6 +98,10 @@ class ResClient {
 	 * @param {object} [opt] Optional parameters.
 	 * @param {function} [opt.onConnect] On connect callback called prior resolving the connect promise and subscribing to stale resources. May return a promise.
 	 * @param {string} [opt.namespace] Event bus namespace. Defaults to 'resclient'.
+	 * @param {bool} [opt.reconnectDelay] Milliseconds between WebSocket reconnect attempts. Defaults to 3000.
+	 * @param {bool} [opt.subscribeStaleDelay] Milliseconds until a subscribe attempt is made on a stale resource. Zero means no attempt to subscribe. Defaults to 2000.
+	 * @param {bool} [opt.subscribeRetryDelay] Milliseconds between subscribe attempts on a stale resource after a failed stale subscribe. Zero means no retries. Defaults to 10000.
+	 * @param {bool} [opt.unsubscribeDelay] Milliseconds between stopping listening to a resource, and the resource being unsubscribed. Defaults to 5000.
 	 * @param {bool} [opt.debug] Flag to debug log all WebSocket communication. Defaults to false.
 	 * @param {module:modapp~EventBus} [opt.eventBus] Event bus.
 	 */
@@ -110,6 +116,10 @@ class ResClient {
 		obj.update(this, opt, {
 			onConnect: { type: '?function' },
 			namespace: { type: 'string', default: defaultNamespace },
+			reconnectDelay: { type: 'number', default: defaultReconnectDelay },
+			subscribeStaleDelay: { type: 'number', default: defaultSubscribeStaleDelay },
+			subscribeRetryDelay: { type: 'number', default: defaultSubscribeRetryDelay },
+			unsubscribeDelay: { type: 'number', default: defaultUnsubscribeDelay },
 			debug: { type: 'boolean', default: false },
 			eventBus: { type: 'object', default: eventBus }
 		});
@@ -681,10 +691,13 @@ class ResClient {
 		return true;
 	}
 
-	_setStale(rid) {
-		this._addStale(rid);
-		if (this.connected) {
-			setTimeout(() => this._subscribeToStale(rid), subscribeStaleDelay);
+	_setStale(rid, isRetry) {
+		// Only try subscribing if not already marked as stale.
+		if (this._addStale(rid)) {
+			let delay = isRetry ? this.subscribeRetryDelay : this.subscribeStaleDelay;
+			if (this.connected && delay) {
+				setTimeout(() => this._subscribeToStale(rid), delay);
+			}
 		}
 	}
 
@@ -692,7 +705,11 @@ class ResClient {
 		if (!this.stale) {
 			this.stale = {};
 		}
+		if (this.stale[rid]) {
+			return false;
+		}
 		this.stale[rid] = true;
+		return true;
 	}
 
 	_removeStale(rid) {
@@ -705,7 +722,7 @@ class ResClient {
 		}
 	}
 
-	_subscribe(ci, throwError) {
+	_subscribe(ci, throwError, isRetry) {
 		let rid = ci.rid;
 		ci.addSubscribed(1);
 		this._removeStale(rid);
@@ -713,7 +730,7 @@ class ResClient {
 			.then(response => this._cacheResources(response))
 			.catch(err => {
 				if (throwError) {
-					this._handleFailedSubscribe(ci);
+					this._handleFailedSubscribe(ci, isRetry);
 					throw err;
 				} else {
 					this._handleUnsubscribeEvent(ci);
@@ -726,7 +743,7 @@ class ResClient {
 			return;
 		}
 
-		this._subscribe(this.cache[rid]);
+		this._subscribe(this.cache[rid], true, true).catch(err => {});
 	}
 
 	_subscribeToAllStale() {
@@ -878,16 +895,17 @@ class ResClient {
 	 * Tries to delete the cached item.
 	 * It will delete if there are no direct listeners, indirect references, or any subscription.
 	 * @param {object} ci Cache item to delete
+	 * @param {boolean} isRetry Flag to tell if call is made as part of a stale subscribe attempt.
 	 * @private
 	 */
-	_tryDelete(ci) {
+	_tryDelete(ci, isRetry) {
 		let refs = this._getRefState(ci);
 
 		for (let rid in refs) {
 			let r = refs[rid];
 			switch (r.st) {
 			case stateStale:
-				this._setStale(rid);
+				this._setStale(rid, isRetry);
 				break;
 			case stateDelete:
 				this._deleteRef(r.ci);
@@ -1222,7 +1240,11 @@ class ResClient {
 		}
 	}
 
-	_unsubscribe(ci) {
+	_unsubscribe(ci, useDelay) {
+		if (useDelay) {
+			return setTimeout(() => this._unsubscribe(ci), this.unsubscribeDelay);
+		}
+
 		if (!ci.subscribed) {
 			if (this.stale && this.stale[ci.rid]) {
 				this._tryDelete(ci);
@@ -1265,9 +1287,9 @@ class ResClient {
 		}
 	}
 
-	_handleFailedSubscribe(cacheItem) {
+	_handleFailedSubscribe(cacheItem, isRetry) {
 		cacheItem.addSubscribed(-1);
-		this._tryDelete(cacheItem);
+		this._tryDelete(cacheItem, isRetry);
 	}
 
 	_reconnect(noDelay) {
@@ -1281,7 +1303,7 @@ class ResClient {
 			}
 
 			this.connect();
-		}, reconnectDelay);
+		}, this.reconnectDelay);
 	}
 
 	_resolvePath(url) {
