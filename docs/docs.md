@@ -70,6 +70,10 @@ Creates a ResClient instance
 | [opt] | <code>object</code> | Optional parameters. |
 | [opt.onConnect] | <code>function</code> | On connect callback called prior resolving the connect promise and subscribing to stale resources. May return a promise. |
 | [opt.namespace] | <code>string</code> | Event bus namespace. Defaults to 'resclient'. |
+| [opt.reconnectDelay] | <code>bool</code> | Milliseconds between WebSocket reconnect attempts. Defaults to 3000. |
+| [opt.subscribeStaleDelay] | <code>bool</code> | Milliseconds until a subscribe attempt is made on a stale resource. Zero means no attempt to subscribe. Defaults to 2000. |
+| [opt.subscribeRetryDelay] | <code>bool</code> | Milliseconds between subscribe attempts on a stale resource after a failed stale subscribe. Zero means no retries. Defaults to 10000. |
+| [opt.unsubscribeDelay] | <code>bool</code> | Milliseconds between stopping listening to a resource, and the resource being unsubscribed. Defaults to 5000. |
 | [opt.debug] | <code>bool</code> | Flag to debug log all WebSocket communication. Defaults to false. |
 | [opt.eventBus] | <code>module:modapp~EventBus</code> | Event bus. |
 
