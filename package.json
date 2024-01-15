@@ -56,7 +56,7 @@
     "typescript": "^4.8.4"
   },
   "dependencies": {
-    "modapp-eventbus": "^1.8.1",
+    "modapp-eventbus": "^1.8.2",
     "modapp-utils": "^1.8.0"
   }
 }
