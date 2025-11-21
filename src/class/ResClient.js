@@ -98,11 +98,11 @@ class ResClient {
 	 * @param {object} [opt] Optional parameters.
 	 * @param {function} [opt.onConnect] On connect callback called prior resolving the connect promise and subscribing to stale resources. May return a promise.
 	 * @param {string} [opt.namespace] Event bus namespace. Defaults to 'resclient'.
-	 * @param {bool} [opt.reconnectDelay] Milliseconds between WebSocket reconnect attempts. Defaults to 3000.
-	 * @param {bool} [opt.subscribeStaleDelay] Milliseconds until a subscribe attempt is made on a stale resource. Zero means no attempt to subscribe. Defaults to 2000.
-	 * @param {bool} [opt.subscribeRetryDelay] Milliseconds between subscribe attempts on a stale resource after a failed stale subscribe. Zero means no retries. Defaults to 10000.
-	 * @param {bool} [opt.unsubscribeDelay] Milliseconds between stopping listening to a resource, and the resource being unsubscribed. Defaults to 5000.
-	 * @param {bool} [opt.debug] Flag to debug log all WebSocket communication. Defaults to false.
+	 * @param {boolean} [opt.reconnectDelay] Milliseconds between WebSocket reconnect attempts. Defaults to 3000.
+	 * @param {boolean} [opt.subscribeStaleDelay] Milliseconds until a subscribe attempt is made on a stale resource. Zero means no attempt to subscribe. Defaults to 2000.
+	 * @param {boolean} [opt.subscribeRetryDelay] Milliseconds between subscribe attempts on a stale resource after a failed stale subscribe. Zero means no retries. Defaults to 10000.
+	 * @param {boolean} [opt.unsubscribeDelay] Milliseconds between stopping listening to a resource, and the resource being unsubscribed. Defaults to 5000.
+	 * @param {boolean|function} [opt.debug] Flag to debug log all WebSocket communication, or logging function. Defaults to false. Function has schema: (type:string,msg:string,ctx:any) => void.
 	 * @param {module:modapp~EventBus} [opt.eventBus] Event bus.
 	 */
 	constructor(hostUrlOrFactory, opt) {
@@ -120,7 +120,6 @@ class ResClient {
 			subscribeStaleDelay: { type: 'number', default: defaultSubscribeStaleDelay },
 			subscribeRetryDelay: { type: 'number', default: defaultSubscribeRetryDelay },
 			unsubscribeDelay: { type: 'number', default: defaultUnsubscribeDelay },
-			debug: { type: 'boolean', default: false },
 			eventBus: { type: 'object', default: eventBus }
 		});
 
@@ -131,6 +130,13 @@ class ResClient {
 		this.reqId = 1; // Incremental request id
 		this.cache = {};
 		this.stale = null;
+		this.debug = opt && opt.hasOwnProperty('debug')
+			? typeof opt.debug == 'function'
+				? opt.debug
+				: opt.debug
+					? (_type, str, ctx) => ctx ? console.debug(str, ctx) : console.debug(str)
+					: null
+			: null;
 
 		// Queue promises
 		this.connectPromise = null;
@@ -468,7 +474,7 @@ class ResClient {
 
 			var json = JSON.stringify(req);
 			if (this.debug) {
-				console.debug("<== " + req.id + ":" + json);
+				this.debug('request', "<== " + req.id + ":" + json);
 			}
 			this.ws.send(json);
 		});
@@ -484,7 +490,7 @@ class ResClient {
 
 		if (data.hasOwnProperty('id')) {
 			if (this.debug) {
-				console.debug("==> " + data.id + ":" + json);
+				this.debug('response', "==> " + data.id + ":" + json);
 			}
 
 			// Find the stored request
@@ -502,7 +508,7 @@ class ResClient {
 			}
 		} else if (data.hasOwnProperty('event')) {
 			if (this.debug) {
-				console.debug("--> " + json);
+				this.debug('event', "--> " + json);
 			}
 			this._handleEvent(data);
 		} else {
@@ -763,7 +769,7 @@ class ResClient {
 	 */
 	_handleOnopen(e) {
 		if (this.debug) {
-			console.debug("ResClient open", e, this);
+			this.debug('open', "ResClient open", e);
 		}
 		this._sendNow('version', { protocol: this.supportedProtocol })
 			.then(ver => {
@@ -806,7 +812,7 @@ class ResClient {
 	 */
 	_handleOnerror(e) {
 		if (this.debug) {
-			console.debug("ResClient error", e, this);
+			this.debug('error', "ResClient error", e);
 		}
 		this._connectReject({ code: 'system.connectionError', message: "Connection error", data: e });
 	}
@@ -827,7 +833,7 @@ class ResClient {
 	 */
 	_handleOnclose(e) {
 		if (this.debug) {
-			console.debug("ResClient close", e, this);
+			this.debug('close', "ResClient close", e);
 		}
 		this.connectPromise = null;
 		this.ws = null;
@@ -1042,6 +1048,10 @@ class ResClient {
 			}
 			break;
 		}
+
+		if (this.debug) {
+			this.debug('cacheDelete', "Cache delete: " + ci.rid);
+		}
 		delete this.cache[ci.rid];
 		this._removeStale(ci.rid);
 	}
@@ -1245,6 +1255,10 @@ class ResClient {
 			return setTimeout(() => this._unsubscribe(ci), this.unsubscribeDelay);
 		}
 
+		if (this.debug) {
+			this.debug('unsubscribe', "Unsubscribe: " + ci.rid);
+		}
+
 		if (!ci.subscribed) {
 			if (this.stale && this.stale[ci.rid]) {
 				this._tryDelete(ci);
@@ -1361,6 +1375,15 @@ class ResClient {
 					// Non-soft reference
 					let ci = this.cache[v.rid];
 					if (addIndirect) {
+						if (!ci) {
+							let err = "resource " + v.rid + " not found in cache when trying to call addIndirect";
+							if (this.debug) {
+								this.debug('addIndirectError', err);
+							} else {
+								console.error(err);
+							}
+							throw new Error(err);
+						}
 						ci.addIndirect();
 					}
 					v = ci.item;
